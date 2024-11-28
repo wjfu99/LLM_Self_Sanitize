@@ -39,7 +39,8 @@ class CircuitBreakerDataset(Dataset):
         benign_dataset = []
         for example in ds:
             messages = example["messages"]
-            if len(messages) < 2: continue
+            if len(messages) < 2: 
+                continue
             truncated_message_index = random.randrange(1, len(messages), 2)
             assert messages[truncated_message_index]["role"] == "assistant"
             messages_u = messages[:truncated_message_index]
@@ -51,7 +52,10 @@ class CircuitBreakerDataset(Dataset):
             a_ids = tokenizer.apply_chat_template(messages_a, tokenize=True)
             assert a_ids[:len(u_ids)] == u_ids
             res_len = len(a_ids) - len(u_ids)
-            truncated_token_index = len(u_ids) + random.randint(5, res_len)
+            start_idx = 5
+            if res_len < start_idx:
+                continue
+            truncated_token_index = len(u_ids) + random.randint(start_idx, res_len)
             input_ids = a_ids[:truncated_token_index]
             
             # formatted_input = tokenizer.apply_chat_template(messages, tokenize=False).replace(tokenizer.bos_token, "")
@@ -62,19 +66,19 @@ class CircuitBreakerDataset(Dataset):
         # ======================= Borderline Retain ======================= #
         # from https://github.com/paul-rottger/exaggerated-safety
         # TODO:This dataset have to be classified!!
-        with open(f'data/xstest_v2_completions_gpt4_gpteval.csv', newline='') as f:
-            data = [dict(row) for row in csv.DictReader(f)]
-            data = [row for row in data if row['final_label'] == "1_full_compliance"]
-        messages = []
-        for d in data:
-            messages.append([{
-                "role": "user",
-                "content": d['prompt']
-            }, {
-                "role": "assistant",
-                "content": d['completion']
-            }])
-        brt_ds = datasets.Dataset.from_dict({"messages": messages})
+        # with open(f'data/xstest_v2_completions_gpt4_gpteval.csv', newline='') as f:
+        #     data = [dict(row) for row in csv.DictReader(f)]
+        #     data = [row for row in data if row['final_label'] == "1_full_compliance"]
+        # messages = []
+        # for d in data:
+        #     messages.append([{
+        #         "role": "user",
+        #         "content": d['prompt']
+        #     }, {
+        #         "role": "assistant",
+        #         "content": d['completion']
+        #     }])
+        # brt_ds = datasets.Dataset.from_dict({"messages": messages})
         
 
         # ======================= Harmful Request--Refuse ======================= #
@@ -82,31 +86,51 @@ class CircuitBreakerDataset(Dataset):
             dataset = json.load(file)
 
         random.shuffle(dataset)
-        dataset = dataset[:2000]
+        # dataset = dataset[:2000]
         refusal_retain_orig = []
         messages = []
+        harm_ref_dataset = []
         for d in dataset:
-            messages.append([{
+            messages = [{
                 "role": "user",
                 "content": d['prompt']
             }, {
                 "role": "assistant",
                 "content": d['llama3_output']
-            }])
-        rrt_ds = datasets.Dataset.from_dict({"messages": messages})
+            }]
+            u_ids = tokenizer.apply_chat_template(messages[0:1], tokenize=True)
+            a_ids = tokenizer.apply_chat_template(messages, tokenize=True)
+            assert a_ids[:len(u_ids)] == u_ids
+            res_len = len(a_ids) - len(u_ids)
+            start_idx = 5
+            if res_len < start_idx:
+                continue
+            truncated_token_index = len(u_ids) + random.randint(start_idx, res_len)
+            input_ids = a_ids[:truncated_token_index]
+            harm_ref_dataset.append(input_ids)
         
         # ======================= Harmful Request--Response ======================= #
         messages = []
+        harm_res_dataset = []
         for d in dataset:
-            messages.append([{
+            messages = [{
                 "role": "user",
                 "content": d['prompt']
             }, {
                 "role": "assistant",
                 "content": d['output']
-            }])
-        cbk_ds = datasets.Dataset.from_dict({"messages": messages})
-
+            }]
+            u_ids = tokenizer.apply_chat_template(messages[0:1], tokenize=True)
+            a_ids = tokenizer.apply_chat_template(messages, tokenize=True)
+            assert a_ids[:len(u_ids)] == u_ids
+            res_len = len(a_ids) - len(u_ids)
+            start_idx = 5
+            if res_len < start_idx:
+                continue
+            truncated_token_index = len(u_ids) + random.randint(start_idx, res_len)
+            input_ids = a_ids[:truncated_token_index]
+            harm_res_dataset.append(input_ids)
+        a = 1
     def __len__(self):
         return min(len(self.orig_s_retain), len(self.circuit_breaker_orig))
     

@@ -9,6 +9,8 @@ from tqdm import tqdm
 import json
 import random
 import csv
+from transformers import AutoTokenizer, AutoModelForCausalLM
+from huggingface_hub import login
 random.seed(0)
 
 class CircuitBreakerDataset(Dataset):
@@ -32,11 +34,34 @@ class CircuitBreakerDataset(Dataset):
 
         # ======================= Retain ======================= #
         ds = load_dataset("HuggingFaceH4/ultrachat_200k", split="test_sft")
-        rt_ds = ds.select_columns("messages")
+        # rt_ds = ds.select_columns("messages")
+        orig_s = []
+        benign_dataset = []
+        for example in ds:
+            messages = example["messages"]
+            if len(messages) < 2: continue
+            truncated_message_index = random.randrange(1, len(messages), 2)
+            assert messages[truncated_message_index]["role"] == "assistant"
+            messages_u = messages[:truncated_message_index]
+            messages_a = messages[:truncated_message_index+1]
+            # last_len = len(messages[-1].split(" "))
+            # truncated_token_index = random.randrange(1, , 2)
+            
+            u_ids = tokenizer.apply_chat_template(messages_u, tokenize=True)
+            a_ids = tokenizer.apply_chat_template(messages_a, tokenize=True)
+            assert a_ids[:len(u_ids)] == u_ids
+            res_len = len(a_ids) - len(u_ids)
+            truncated_token_index = len(u_ids) + random.randint(5, res_len)
+            input_ids = a_ids[:truncated_token_index]
+            
+            # formatted_input = tokenizer.apply_chat_template(messages, tokenize=False).replace(tokenizer.bos_token, "")
+            benign_dataset.append(input_ids)
+            # orig_s.append(formatted_input)
         
 
         # ======================= Borderline Retain ======================= #
         # from https://github.com/paul-rottger/exaggerated-safety
+        # TODO:This dataset have to be classified!!
         with open(f'data/xstest_v2_completions_gpt4_gpteval.csv', newline='') as f:
             data = [dict(row) for row in csv.DictReader(f)]
             data = [row for row in data if row['final_label'] == "1_full_compliance"]
@@ -50,8 +75,9 @@ class CircuitBreakerDataset(Dataset):
                 "content": d['completion']
             }])
         brt_ds = datasets.Dataset.from_dict({"messages": messages})
+        
 
-        # ======================= Refusal Retain ======================= #
+        # ======================= Harmful Request--Refuse ======================= #
         with open("data/circuit_breakers_train.json") as file:
             dataset = json.load(file)
 
@@ -69,6 +95,7 @@ class CircuitBreakerDataset(Dataset):
             }])
         rrt_ds = datasets.Dataset.from_dict({"messages": messages})
         
+        # ======================= Harmful Request--Response ======================= #
         messages = []
         for d in dataset:
             messages.append([{
@@ -118,4 +145,8 @@ class CircuitBreakerDataset(Dataset):
             attention_mask_val=tokenized_inputs_val["attention_mask"],
         )
 
-train_dataset = CircuitBreakerDataset()
+
+login("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")
+# Model
+tokenizer = AutoTokenizer.from_pretrained("mistralai/Mistral-7B-Instruct-v0.2")
+train_dataset = CircuitBreakerDataset(tokenizer=tokenizer)

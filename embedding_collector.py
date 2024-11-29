@@ -13,6 +13,7 @@ from collections import defaultdict, Counter
 from functools import partial
 import re
 from string import Template
+from dataset_constructor import create_dataset
 
 
 # Data related params
@@ -41,12 +42,13 @@ ig_steps = 64
 internal_batch_size = 4
 
 # Model
-model_name = "falcon-7b" #"opt-30b"
+model_name = "falcon-7b-instruct" #"opt-30b"
 layer_number = -1
 # hardcode below,for now. Could dig into all models but they take a while to load
 model_num_layers = {
     "falcon-40b" : 60,
     "falcon-7b" : 32,
+    "falcon-7b-instruct" : 32,
     "open_llama_13b" : 40,
     "open_llama_7b" : 32,
     "opt-6.7b" : 32,
@@ -57,6 +59,7 @@ coll_str = "[0-9]+" if layer_number==-1 else str(layer_number)
 model_repos = {
     "falcon-40b" : ("tiiuae", f".*transformer.h.{coll_str}.mlp.dense_4h_to_h", f".*transformer.h.{coll_str}.self_attention.dense"),
     "falcon-7b" : ("tiiuae", f".*transformer.h.{coll_str}.mlp.dense_4h_to_h", f".*transformer.h.{coll_str}.self_attention.dense"),
+    "falcon-7b-instruct" : ("tiiuae", f".*transformer.h.{coll_str}.mlp.dense_4h_to_h", f".*transformer.h.{coll_str}.self_attention.dense"),
     "open_llama_13b" : ("openlm-research", f".*model.layers.{coll_str}.mlp.up_proj", f".*model.layers.{coll_str}.self_attn.o_proj"),
     "open_llama_7b" : ("openlm-research", f".*model.layers.{coll_str}.mlp.up_proj", f".*model.layers.{coll_str}.self_attn.o_proj"),
     "opt-6.7b" : ("facebook", f".*model.decoder.layers.{coll_str}.fc2", f".*model.decoder.layers.{coll_str}.self_attn.out_proj"),
@@ -210,8 +213,8 @@ def get_embedder(model):
 
 def compute_and_save_results():
 
-    # Dataset
-    dataset = load_data()
+
+    # dataset = load_data()
     if dataset_name in trex_data_to_question_template.keys():
         question_asker = functools.partial(answer_trex, question_template=trex_data_to_question_template[dataset_name])
     elif dataset_name == "trivia_qa":
@@ -239,30 +242,35 @@ def compute_and_save_results():
                 partial(save_fully_connected_hidden, name))
         if re.match(f'{model_repos[model_name][2]}$', name):
             attention_forward_handles[name] = module.register_forward_hook(partial(save_attention_hidden, name))
-
+    
+    # Dataset
+    dataset_dict = create_dataset(tokenizer=tokenizer)
     # Generate results
     results = defaultdict(list)
-    for idx in tqdm(range(len(dataset))):
-        fully_connected_hidden_layers.clear()
-        attention_hidden_layers.clear()
+    for key, dataset in dataset_dict.items():
+        for idx in tqdm(range(len(dataset))):
+            fully_connected_hidden_layers.clear()
+            attention_hidden_layers.clear()
 
-        question, answers = dataset[idx]
-        response, str_response, logits, start_pos, correct = question_asker(question, answers, model, tokenizer)
-        layer_start, layer_end = get_start_end_layer(model)
-        first_fully_connected, final_fully_connected = collect_fully_connected(start_pos, layer_start, layer_end)
-        first_attention, final_attention = collect_attention(start_pos, layer_start, layer_end)
+            input_ids = dataset[idx]["input_ids"].to(device)
+            start_pos = dataset[idx]["res_start_idx"]
+            outputs = model(input_ids)
+            # response, str_response, logits, start_pos, correct = question_asker(question, answers, model, tokenizer)
+            layer_start, layer_end = get_start_end_layer(model)
+            first_fully_connected, final_fully_connected = collect_fully_connected(start_pos, layer_start, layer_end)
+            first_attention, final_attention = collect_attention(start_pos, layer_start, layer_end)
 
-        results['question'].append(question)
-        results['answers'].append(answers)
-        results['response'].append(response)
-        results['str_response'].append(str_response)
-        results['logits'].append(logits.to(torch.float32).cpu().numpy())
-        results['start_pos'].append(start_pos)
-        results['correct'].append(correct)
-        results['first_fully_connected'].append(first_fully_connected)
-        results['final_fully_connected'].append(final_fully_connected)
-        results['first_attention'].append(first_attention)
-        results['final_attention'].append(final_attention)
+            results['question'].append(question)
+            results['answers'].append(answers)
+            results['response'].append(response)
+            results['str_response'].append(str_response)
+            results['logits'].append(logits.to(torch.float32).cpu().numpy())
+            results['start_pos'].append(start_pos)
+            results['correct'].append(correct)
+            results['first_fully_connected'].append(first_fully_connected)
+            results['final_fully_connected'].append(final_fully_connected)
+            results['first_attention'].append(first_attention)
+            results['final_attention'].append(final_attention)
     with open(results_dir/f"{model_name}_{dataset_name}_start-{start}_end-{end}_{datetime.now().month}_{datetime.now().day}.pickle", "wb") as outfile:
         outfile.write(pickle.dumps(results))
 

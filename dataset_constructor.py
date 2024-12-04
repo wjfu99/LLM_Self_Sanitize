@@ -14,7 +14,9 @@ random.seed(0)
 
 def create_dataset( 
             tokenizer=None, 
-            num_examples=10000,
+            max_exa=4000,
+            min_res_len=5,
+            max_res_len=50,
             ):
 
     one_shot_template = "{user_tag}{instruction}{assistant_tag}<SEPARATOR>{response}"
@@ -29,7 +31,7 @@ def create_dataset(
     ds = load_dataset("HuggingFaceH4/ultrachat_200k", split="test_sft")
     # rt_ds = ds.select_columns("messages")
     orig_s = []
-    benign_dataset = {"input_ids": [], "res_start_idx": []}
+    benign_dataset = {"input_ids": [], "res_start_idx": [], "qa_str": []}
     for example in ds:
         messages = example["messages"]
         if len(messages) < 2: 
@@ -46,16 +48,17 @@ def create_dataset(
         a_ids = tokenizer.apply_chat_template(messages_a, tokenize=True)
         assert a_ids[:len(u_ids)] == u_ids
         res_len = len(a_ids) - len(u_ids)
-        start_idx = 5
-        if res_len < start_idx:
+        if res_len < min_res_len:
             continue
-        truncated_token_index = len(u_ids) + random.randint(start_idx, res_len)
+        truncated_token_index = len(u_ids) + random.randint(min_res_len, min(res_len, max_res_len))
         input_ids = a_ids[:truncated_token_index]
         
         # formatted_input = tokenizer.apply_chat_template(messages, tokenize=False).replace(tokenizer.bos_token, "")
         benign_dataset["input_ids"].append(input_ids)
         benign_dataset["res_start_idx"].append(len(u_ids))
-        benign_dataset["qa_str"] = tokenizer.decode(input_ids)
+        benign_dataset["qa_str"].append(tokenizer.decode(input_ids))
+        if len(benign_dataset["input_ids"]) >= max_exa:
+            break
         # orig_s.append(formatted_input)
     
 
@@ -85,7 +88,7 @@ def create_dataset(
     # dataset = dataset[:2000]
     refusal_retain_orig = []
     messages = []
-    harm_ref_dataset = {"input_ids": [], "res_start_idx": []}
+    harm_ref_dataset = {"input_ids": [], "res_start_idx": [], "qa_str": []}
     for d in dataset:
         messages = [{
             "role": "user",
@@ -98,18 +101,19 @@ def create_dataset(
         a_ids = tokenizer.apply_chat_template(messages, tokenize=True)
         assert a_ids[:len(u_ids)] == u_ids
         res_len = len(a_ids) - len(u_ids)
-        start_idx = 5
-        if res_len < start_idx:
+        if res_len < min_res_len:
             continue
-        truncated_token_index = len(u_ids) + random.randint(start_idx, res_len)
+        truncated_token_index = len(u_ids) + random.randint(min_res_len, min(res_len, max_res_len))
         input_ids = a_ids[:truncated_token_index]
         harm_ref_dataset["input_ids"].append(input_ids)
         harm_ref_dataset["res_start_idx"].append(len(u_ids))
-        harm_ref_dataset["qa_str"] = tokenizer.decode(input_ids)
+        harm_ref_dataset["qa_str"].append(tokenizer.decode(input_ids))
+        if len(harm_ref_dataset["input_ids"]) >= max_exa:
+            break
     
     # ======================= Harmful Request--Response ======================= #
     messages = []
-    harm_res_dataset = {"input_ids": [], "res_start_idx": []}
+    harm_res_dataset = {"input_ids": [], "res_start_idx": [], "qa_str": []}
     for d in dataset:
         messages = [{
             "role": "user",
@@ -122,14 +126,15 @@ def create_dataset(
         a_ids = tokenizer.apply_chat_template(messages, tokenize=True)
         assert a_ids[:len(u_ids)] == u_ids
         res_len = len(a_ids) - len(u_ids)
-        start_idx = 5
-        if res_len < start_idx:
+        if res_len < min_res_len:
             continue
-        truncated_token_index = len(u_ids) + random.randint(start_idx, res_len)
+        truncated_token_index = len(u_ids) + random.randint(min_res_len, min(res_len, max_res_len))
         input_ids = a_ids[:truncated_token_index]
         harm_res_dataset["input_ids"].append(input_ids)
         harm_res_dataset["res_start_idx"].append(len(u_ids))
-        harm_res_dataset["qa_str"] = tokenizer.decode(input_ids)
+        harm_res_dataset["qa_str"].append(tokenizer.decode(input_ids))
+        if len(harm_res_dataset["input_ids"]) >= max_exa:
+            break
         
     benign_dataset = Dataset.from_dict(benign_dataset).shuffle()
     harm_ref_dataset = Dataset.from_dict(harm_ref_dataset).shuffle()

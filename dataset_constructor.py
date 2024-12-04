@@ -1,6 +1,5 @@
-from torch.utils.data import Dataset
-import datasets
-from datasets import load_dataset
+
+from datasets import load_dataset, Dataset
 import transformers
 from typing import Dict
 import torch
@@ -128,9 +127,9 @@ def create_dataset(
         harm_res_dataset["input_ids"].append(input_ids)
         harm_res_dataset["res_start_idx"].append(len(u_ids))
         
-    benign_dataset = datasets.from_dict({"input_ids": benign_dataset})
-    harm_ref_dataset = datasets.from_dict({"input_ids": harm_ref_dataset})
-    harm_res_dataset = datasets.from_dict({"input_ids": harm_res_dataset})
+    benign_dataset = Dataset.from_dict(benign_dataset).shuffle()
+    harm_ref_dataset = Dataset.from_dict(harm_ref_dataset).shuffle()
+    harm_res_dataset = Dataset.from_dict(harm_res_dataset).shuffle()
     return {
         "benign": benign_dataset,
         "harm_ref": harm_ref_dataset,

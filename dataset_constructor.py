@@ -34,7 +34,8 @@ def create_dataset(
         messages = example["messages"]
         if len(messages) < 2: 
             continue
-        truncated_message_index = random.randrange(1, len(messages), 2)
+        # truncated_message_index = random.randrange(1, len(messages), 2)
+        truncated_message_index = 1
         assert messages[truncated_message_index]["role"] == "assistant"
         messages_u = messages[:truncated_message_index]
         messages_a = messages[:truncated_message_index+1]
@@ -54,6 +55,7 @@ def create_dataset(
         # formatted_input = tokenizer.apply_chat_template(messages, tokenize=False).replace(tokenizer.bos_token, "")
         benign_dataset["input_ids"].append(input_ids)
         benign_dataset["res_start_idx"].append(len(u_ids))
+        benign_dataset["qa_str"] = tokenizer.decode(input_ids)
         # orig_s.append(formatted_input)
     
 
@@ -103,6 +105,7 @@ def create_dataset(
         input_ids = a_ids[:truncated_token_index]
         harm_ref_dataset["input_ids"].append(input_ids)
         harm_ref_dataset["res_start_idx"].append(len(u_ids))
+        harm_ref_dataset["qa_str"] = tokenizer.decode(input_ids)
     
     # ======================= Harmful Request--Response ======================= #
     messages = []
@@ -126,6 +129,7 @@ def create_dataset(
         input_ids = a_ids[:truncated_token_index]
         harm_res_dataset["input_ids"].append(input_ids)
         harm_res_dataset["res_start_idx"].append(len(u_ids))
+        harm_res_dataset["qa_str"] = tokenizer.decode(input_ids)
         
     benign_dataset = Dataset.from_dict(benign_dataset).shuffle()
     harm_ref_dataset = Dataset.from_dict(harm_ref_dataset).shuffle()

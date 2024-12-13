@@ -254,20 +254,24 @@ def compute_and_save_results():
 
             input_ids = torch.tensor([dataset[idx]["input_ids"]]).to(device)
             qa_str = tokenizer.decode(input_ids[0], skip_special_tokens=True)
-            start_pos = dataset[idx]["res_start_idx"]
+            start_pos = dataset[idx]["res_start_idx"] + 5
+            length = len(input_ids[0])
+            end_pos = min(length, start_pos+50)
             outputs = model(input_ids)
             # response, str_response, logits, start_pos, correct = question_asker(question, answers, model, tokenizer)
             layer_start, layer_end = get_start_end_layer(model)
-            first_fully_connected, final_fully_connected = collect_fully_connected(-1, layer_start, layer_end)
-            first_attention, final_attention = collect_attention(-1, layer_start, layer_end)
+            layer_start = 16
+            layer_end = 20
+            first_fully_connected, final_fully_connected = collect_fully_connected(range(start_pos, end_pos), layer_start, layer_end)
+            first_attention, final_attention = collect_attention(range(start_pos, end_pos), layer_start, layer_end)
 
             results['qa_str'].append(qa_str)
             results['start_pos'].append(start_pos)
             results['label'].append(key)
             results['first_fully_connected'].append(first_fully_connected)
-            results['final_fully_connected'].append(final_fully_connected)
+            # results['final_fully_connected'].append(final_fully_connected)
             results['first_attention'].append(first_attention)
-            results['final_attention'].append(final_attention)
+            # results['final_attention'].append(final_attention)
     with open(results_dir/f"{model_name}_{dataset_name}_start-{start}_end-{end}_{datetime.now().month}_{datetime.now().day}.pickle", "wb") as outfile:
         outfile.write(pickle.dumps(results))
 

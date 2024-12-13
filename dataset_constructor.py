@@ -48,7 +48,8 @@ def create_dataset(
         a_ids = tokenizer.apply_chat_template(messages_a, tokenize=True)
         assert a_ids[:len(u_ids)] == u_ids
         res_len = len(a_ids) - len(u_ids)
-        if res_len < min_res_len:
+        all_len = len(a_ids)
+        if res_len < min_res_len or all_len > 512:
             continue
         # truncated_token_index = len(u_ids) + random.randint(min_res_len, min(res_len, max_res_len))
         # input_ids = a_ids[:truncated_token_index]

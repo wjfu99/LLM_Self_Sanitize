@@ -50,13 +50,13 @@ def create_dataset(
         res_len = len(a_ids) - len(u_ids)
         if res_len < min_res_len:
             continue
-        truncated_token_index = len(u_ids) + random.randint(min_res_len, min(res_len, max_res_len))
-        input_ids = a_ids[:truncated_token_index]
+        # truncated_token_index = len(u_ids) + random.randint(min_res_len, min(res_len, max_res_len))
+        # input_ids = a_ids[:truncated_token_index]
         
         # formatted_input = tokenizer.apply_chat_template(messages, tokenize=False).replace(tokenizer.bos_token, "")
-        benign_dataset["input_ids"].append(input_ids)
+        benign_dataset["input_ids"].append(a_ids)
         benign_dataset["res_start_idx"].append(len(u_ids))
-        benign_dataset["qa_str"].append(tokenizer.decode(input_ids))
+        benign_dataset["qa_str"].append(tokenizer.decode(a_ids))
         if len(benign_dataset["input_ids"]) >= max_exa:
             break
         # orig_s.append(formatted_input)
@@ -103,11 +103,11 @@ def create_dataset(
         res_len = len(a_ids) - len(u_ids)
         if res_len < min_res_len:
             continue
-        truncated_token_index = len(u_ids) + random.randint(min_res_len, min(res_len, max_res_len))
-        input_ids = a_ids[:truncated_token_index]
-        harm_ref_dataset["input_ids"].append(input_ids)
+        # truncated_token_index = len(u_ids) + random.randint(min_res_len, min(res_len, max_res_len))
+        # input_ids = a_ids[:truncated_token_index]
+        harm_ref_dataset["input_ids"].append(a_ids)
         harm_ref_dataset["res_start_idx"].append(len(u_ids))
-        harm_ref_dataset["qa_str"].append(tokenizer.decode(input_ids))
+        harm_ref_dataset["qa_str"].append(tokenizer.decode(a_ids))
         if len(harm_ref_dataset["input_ids"]) >= max_exa:
             break
     
@@ -128,11 +128,11 @@ def create_dataset(
         res_len = len(a_ids) - len(u_ids)
         if res_len < min_res_len:
             continue
-        truncated_token_index = len(u_ids) + random.randint(min_res_len, min(res_len, max_res_len))
-        input_ids = a_ids[:truncated_token_index]
-        harm_res_dataset["input_ids"].append(input_ids)
+        # truncated_token_index = len(u_ids) + random.randint(min_res_len, min(res_len, max_res_len))
+        # input_ids = a_ids[:truncated_token_index]
+        harm_res_dataset["input_ids"].append(a_ids)
         harm_res_dataset["res_start_idx"].append(len(u_ids))
-        harm_res_dataset["qa_str"].append(tokenizer.decode(input_ids))
+        harm_res_dataset["qa_str"].append(tokenizer.decode(a_ids))
         if len(harm_res_dataset["input_ids"]) >= max_exa:
             break
         

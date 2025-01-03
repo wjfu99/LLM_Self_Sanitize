@@ -257,6 +257,7 @@ def compute_and_save_results():
             start_pos = dataset[idx]["res_start_idx"] + 5
             length = len(input_ids[0])
             end_pos = min(length, start_pos+50)
+            input_ids = input_ids[:, :end_pos]
             outputs = model(input_ids)
             # response, str_response, logits, start_pos, correct = question_asker(question, answers, model, tokenizer)
             layer_start, layer_end = get_start_end_layer(model)

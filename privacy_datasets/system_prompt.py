@@ -50,6 +50,18 @@ def get_sys_messages(dataset, k=2, num_cases=1000, start_index=0, resposne_type=
         all_messages.append(messages)
     return all_messages
 
-all_messages = get_sys_messages(filtered_dataset, k=2, num_cases=1000)
-# Output the filtered data
-print(filtered_dataset)
+random.shuffle(filtered_dataset)
+regular_messages = get_sys_messages(filtered_dataset, k=2, num_cases=1000, start_index=0, resposne_type="regular")
+attack_messages = get_sys_messages(filtered_dataset, k=2, num_cases=1000, start_index=1000, resposne_type="attack")
+
+regular_dataset = datasets.Dataset.from_dict({
+    "messages": regular_messages,
+    "label": [0] * len(regular_messages)
+})
+attack_dataset = datasets.Dataset.from_dict({
+    "messages": attack_messages,
+    "label": [1] * len(regular_messages)
+})
+
+all_dataset = datasets.concatenate_datasets([regular_dataset, attack_dataset])
+all_dataset.save_to_disk("./preprocessed/system_prompt")

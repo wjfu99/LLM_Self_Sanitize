@@ -10,7 +10,36 @@ import random
 import csv
 from transformers import AutoTokenizer, AutoModelForCausalLM
 from huggingface_hub import login
+import warnings
 random.seed(0)
+
+
+def data_preprocess(dataset, tokenizer, max_exa=4000, min_res_len=5, max_res_len=50):
+    
+    preprocessed_dataset = {"input_ids": [], "res_start_idx": [], "ori_str": []}
+    for example in dataset:
+        messages = example["messages"]
+        if len(messages) < 2: 
+            continue
+        truncated_message_index = len(messages) - 1
+        # assert messages[truncated_message_index]["role"] == "assistant"
+        messages_u = messages[:truncated_message_index]
+        messages_a = messages[:truncated_message_index+1]
+        u_ids = tokenizer.apply_chat_template(messages_u, tokenize=True)
+        a_ids = tokenizer.apply_chat_template(messages_a, tokenize=True)
+        assert a_ids[:len(u_ids)] == u_ids
+        res_len = len(a_ids) - len(u_ids)
+        all_len = len(a_ids)
+        if res_len < min_res_len:
+            warnings.warn("The response is too short, skip this example")
+            continue
+        preprocessed_dataset["input_ids"].append(a_ids)
+        preprocessed_dataset["res_start_idx"].append(len(u_ids))
+        preprocessed_dataset["ori_str"].append(tokenizer.decode(a_ids))
+        if len(preprocessed_dataset["input_ids"]) >= max_exa:
+            break
+    preprocessed_dataset = Dataset.from_dict(preprocessed_dataset).shuffle()
+    return preprocessed_dataset
 
 def create_dataset( 
             tokenizer=None, 

@@ -1,3 +1,7 @@
+import os
+os.environ["hf_endpoint"] = "https://hf-mirror.com"
+# os.environ["HF_HOME"] = "/home/fuwenjie/luc0_data/hf-cache/main"
+
 import functools
 from datetime import datetime
 from typing import Any, Dict
@@ -8,13 +12,18 @@ import pandas as pd
 import torch
 from transformers import AutoTokenizer, AutoModelForCausalLM, AutoModelForSeq2SeqLM, LlamaTokenizer, LlamaForCausalLM
 from tqdm import tqdm
+import datasets
 from datasets import load_dataset
 from collections import defaultdict, Counter
 from functools import partial
 import re
 from string import Template
 from dataset_constructor import create_dataset
+from utils import data_preprocess
+from huggingface_hub import login
 
+# Hf credentials
+login("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")
 
 # Data related params
 iteration = 0
@@ -22,27 +31,17 @@ interval = 2500 # We run the inference on these many examples at a time to achie
 start = iteration * interval
 end = start + interval
 dataset_name = "place_of_birth" # "trivia_qa" #"capitals"
-trex_data_to_question_template = {
-    "capitals": Template("What is the capital of $source?"),
-    "place_of_birth": Template("Where was $source born?"),
-    "founders": Template("Who founded $source?"),
-}
 
 # IO
 data_dir = Path(".") # Where our data files are stored
-model_dir = Path("/home/fuwenjie/Extraction-LLMs/cache") # Cache for huggingface models
 results_dir = Path("./results/") # Directory for storing results
 
 # Hardware
 gpu = "0"
 device = torch.device(f"cuda:{gpu}" if torch.cuda.is_available() else "cpu")
 
-# Integrated Grads
-ig_steps = 64
-internal_batch_size = 4
-
 # Model
-model_name = "falcon-7b-instruct" #"opt-30b"
+model_name = "Llama-2-13b-chat-hf" #"opt-30b"
 layer_number = -1
 # hardcode below,for now. Could dig into all models but they take a while to load
 model_num_layers = {
@@ -53,6 +52,7 @@ model_num_layers = {
     "open_llama_7b" : 32,
     "opt-6.7b" : 32,
     "opt-30b" : 48,
+    "Llama-2-13b-chat-hf": 32
 }
 assert layer_number < model_num_layers[model_name]
 coll_str = "[0-9]+" if layer_number==-1 else str(layer_number)
@@ -64,6 +64,7 @@ model_repos = {
     "open_llama_7b" : ("openlm-research", f".*model.layers.{coll_str}.mlp.up_proj", f".*model.layers.{coll_str}.self_attn.o_proj"),
     "opt-6.7b" : ("facebook", f".*model.decoder.layers.{coll_str}.fc2", f".*model.decoder.layers.{coll_str}.self_attn.out_proj"),
     "opt-30b" : ("facebook", f".*model.decoder.layers.{coll_str}.fc2", f".*model.decoder.layers.{coll_str}.self_attn.out_proj", ),
+    "Llama-2-13b-chat-hf": ("meta-llama", f".*model.layers.{coll_str}.mlp.up_proj", f".*model.layers.{coll_str}.self_attn.o_proj")
 }
 
 # For storing results
@@ -89,26 +90,6 @@ def get_stop_token():
     else:
         stop_token = 50118
     return stop_token
-
-
-def load_data():
-    if dataset_name in trex_data_to_question_template.keys():
-        pd_frame = pd.read_csv(data_dir / f'{dataset_name}.csv')
-        dataset = [(pd_frame.iloc[i]['subject'], pd_frame.iloc[i]['object'].split("<OR>")) for i in range(start, min(end, len(pd_frame)))]
-    elif dataset_name=="trivia_qa":
-        trivia_qa = load_dataset('trivia_qa', 'rc.nocontext', cache_dir=str(data_dir))
-        full_dataset = []
-        for obs in tqdm(trivia_qa['train']):
-            aliases = []
-            aliases.extend(obs['answer']['aliases'])
-            aliases.extend(obs['answer']['normalized_aliases'])
-            aliases.append(obs['answer']['value'])
-            aliases.append(obs['answer']['normalized_value'])
-            full_dataset.append((obs['question'], aliases))
-        dataset = full_dataset[start: end]
-    else:
-        raise ValueError(f"Unknown dataset {dataset_name}.")
-    return dataset
 
 
 def get_next_token(x, model):
@@ -213,27 +194,23 @@ def get_embedder(model):
 
 def compute_and_save_results():
 
-
-    # dataset = load_data()
-    if dataset_name in trex_data_to_question_template.keys():
-        question_asker = functools.partial(answer_trex, question_template=trex_data_to_question_template[dataset_name])
-    elif dataset_name == "trivia_qa":
-        question_asker = answer_trivia
-    else:
-        raise ValueError(f"Unknown dataset name {dataset_name}.")
-
     # Model
-    model_loader = LlamaForCausalLM if "llama" in model_name else AutoModelForCausalLM
-    token_loader = LlamaTokenizer if "llama" in model_name else AutoTokenizer
-    tokenizer = token_loader.from_pretrained(f'{model_repos[model_name][0]}/{model_name}')
-    model = model_loader.from_pretrained(f'{model_repos[model_name][0]}/{model_name}',
-                                         cache_dir=model_dir,
+    tokenizer = AutoTokenizer.from_pretrained(f'{model_repos[model_name][0]}/{model_name}')
+    model = AutoModelForCausalLM.from_pretrained(f'{model_repos[model_name][0]}/{model_name}',
                                          device_map=device,
                                          torch_dtype=torch.bfloat16,
                                          # load_in_4bit=True,
                                          trust_remote_code=True)
-    forward_func = partial(model_forward, model=model, extra_forward_args={})
-    embedder = get_embedder(model)
+    # forward_func = partial(model_forward, model=model, extra_forward_args={})
+    # embedder = get_embedder(model)
+    
+    # Load the datasets
+    dataset_list = ["privacy_inference", "system_prompt", "user_prompt"]
+    dataset_dict = {}
+    for dataset in dataset_list:
+        raw_dataset = datasets.load_from_disk(f"./privacy_datasets/preprocessed/{dataset}")
+        preprocessed_dataset = data_preprocess(raw_dataset, tokenizer)
+        dataset_dict[dataset] = preprocessed_dataset
 
     # Prepare to save the internal states
     for name, module in model.named_modules():

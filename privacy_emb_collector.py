@@ -209,7 +209,8 @@ def compute_and_save_results():
     dataset_dict = {}
     for dataset in dataset_list:
         raw_dataset = datasets.load_from_disk(f"./privacy_datasets/preprocessed/{dataset}")
-        preprocessed_dataset = data_preprocess(raw_dataset, tokenizer)
+        preprocessing_function = functools.partial(data_preprocess, tokenizer=tokenizer)
+        preprocessed_dataset = raw_dataset.map(preprocessing_function, load_from_cache_file=False, num_proc=8)
         dataset_dict[dataset] = preprocessed_dataset
 
     # Prepare to save the internal states
@@ -221,7 +222,8 @@ def compute_and_save_results():
             attention_forward_handles[name] = module.register_forward_hook(partial(save_attention_hidden, name))
     
     # Dataset
-    dataset_dict = create_dataset(tokenizer=tokenizer)
+    # dataset_dict = create_dataset(tokenizer=tokenizer)
+    
     # Generate results
     results = defaultdict(list)
     for key, dataset in dataset_dict.items():

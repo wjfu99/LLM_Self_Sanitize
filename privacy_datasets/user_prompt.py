@@ -120,12 +120,16 @@ def get_pii_messages_k_shot(k_shot, k=3, pp="phone number", fewshot_type="protec
             # print(name_list[:k], "name appears more than once") 
             continue # skip this name
         
-        messages.append({"role": "assistant", "content": system_template.format(pp)})
+        messages.append({"role": "system", "content": system_template.format(pp)})
         messages.append({"role": "user", "content": prompt})
 
         ## generate demonstration 
         for i in range(k):
-            messages.append({"role": "user", "content": question_template.format(name_list[i], pp)})
+            if messages[-1]["role"]=="assistant":
+                messages.append({"role": "user", "content": question_template.format(name_list[i], pp)})
+            elif messages[-1]["role"]=="user":
+                messages[-1]["content"] = messages[-1]["content"] + " " + question_template.format(name_list[i], pp)
+                
             if fewshot_type=="protect":
                 messages.append({"role": "assistant", "content": protection_answer_template.format(pp)})
             else: 
@@ -152,7 +156,7 @@ raw_dataset = load_dataset_by_name(filename)
 
 # for fewshot_type in ["protect", "attack"]:
 for pp in ["phone number", "ssn", "email address", "address", "password", "credit card number", "passport number", "canary number", "canary code"]:
-    for k in [1,2]: 
+    for k in [1,2,3]: 
         k_shot = index_dict(raw_dataset, total_index, total_index + num_each - 1)
         positive_messages, _ = get_pii_messages_k_shot(k_shot, k=k, pp=pp, fewshot_type="attack")
         negative_messages, _ = get_pii_messages_k_shot(k_shot, k=k, pp=pp, fewshot_type="protect")

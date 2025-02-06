@@ -31,6 +31,7 @@ interval = 2500 # We run the inference on these many examples at a time to achie
 start = iteration * interval
 end = start + interval
 dataset_name = "place_of_birth" # "trivia_qa" #"capitals"
+use_cache = True
 
 # IO
 data_dir = Path(".") # Where our data files are stored
@@ -135,7 +136,7 @@ def answer_trex(source, targets, model, tokenizer, question_template):
 
 
 def get_start_end_layer(model):
-    if "llama" in model_name:
+    if "llama" in model_name.lower():
         layer_count = model.model.layers
     elif "falcon" in model_name:
         layer_count = model.transformer.h
@@ -207,11 +208,13 @@ def compute_and_save_results():
     # Load the datasets
     dataset_list = ["privacy_inference", "system_prompt", "user_prompt"]
     dataset_dict = {}
+    preprocessing_function = functools.partial(data_preprocess, tokenizer=tokenizer)
+    dataset_dict["regular_chat"] = load_dataset("HuggingFaceH4/ultrachat_200k", split="test_sft").map(preprocessing_function, load_from_cache_file=use_cache, num_proc=8)
     for dataset in dataset_list:
         raw_dataset = datasets.load_from_disk(f"./privacy_datasets/preprocessed/{dataset}")
-        preprocessing_function = functools.partial(data_preprocess, tokenizer=tokenizer)
-        preprocessed_dataset = raw_dataset.map(preprocessing_function, load_from_cache_file=False, num_proc=8)
+        preprocessed_dataset = raw_dataset.map(preprocessing_function, load_from_cache_file=use_cache, num_proc=8)
         dataset_dict[dataset] = preprocessed_dataset
+
 
     # Prepare to save the internal states
     for name, module in model.named_modules():
@@ -239,9 +242,9 @@ def compute_and_save_results():
             input_ids = input_ids[:, :end_pos]
             outputs = model(input_ids)
             # response, str_response, logits, start_pos, correct = question_asker(question, answers, model, tokenizer)
-            layer_start, layer_end = get_start_end_layer(model)
-            layer_start = 16
-            layer_end = 20
+            # layer_start, layer_end = get_start_end_layer(model)
+            layer_start = 32
+            layer_end = 36
             first_fully_connected, final_fully_connected = collect_fully_connected(range(start_pos, end_pos), layer_start, layer_end)
             first_attention, final_attention = collect_attention(range(start_pos, end_pos), layer_start, layer_end)
 

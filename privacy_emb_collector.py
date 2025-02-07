@@ -32,6 +32,12 @@ start = iteration * interval
 end = start + interval
 dataset_name = "place_of_birth" # "trivia_qa" #"capitals"
 use_cache = True
+dataset_length = {
+    "privacy_inference": 1000, 
+    "system_prompt": 1000,
+    "user_prompt": 1000, 
+    "regular_chat":1000
+}
 
 # IO
 data_dir = Path(".") # Where our data files are stored
@@ -206,15 +212,18 @@ def compute_and_save_results():
     # embedder = get_embedder(model)
     
     # Load the datasets
-    dataset_list = ["privacy_inference", "system_prompt", "user_prompt"]
+    dataset_list = dataset_length.keys()
     dataset_dict = {}
     preprocessing_function = functools.partial(data_preprocess, tokenizer=tokenizer)
-    dataset_dict["regular_chat"] = load_dataset("HuggingFaceH4/ultrachat_200k", split="test_sft").map(preprocessing_function, load_from_cache_file=use_cache, num_proc=8)
     for dataset in dataset_list:
-        raw_dataset = datasets.load_from_disk(f"./privacy_datasets/preprocessed/{dataset}")
-        preprocessed_dataset = raw_dataset.map(preprocessing_function, load_from_cache_file=use_cache, num_proc=8)
-        dataset_dict[dataset] = preprocessed_dataset
-
+        if dataset == "regular_chat":
+            dataset_dict["regular_chat"] = load_dataset("HuggingFaceH4/ultrachat_200k", split="test_sft").map(preprocessing_function, load_from_cache_file=use_cache, num_proc=8)
+        else:
+            raw_dataset = datasets.load_from_disk(f"./privacy_datasets/preprocessed/{dataset}")
+            preprocessed_dataset = raw_dataset.map(preprocessing_function, load_from_cache_file=use_cache, num_proc=8)
+            dataset_dict[dataset] = preprocessed_dataset
+    for key, dataset in dataset_dict.items():
+        dataset_dict[key] = dataset.select(range(1000))
 
     # Prepare to save the internal states
     for name, module in model.named_modules():

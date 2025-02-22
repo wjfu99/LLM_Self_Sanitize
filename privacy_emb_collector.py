@@ -33,8 +33,8 @@ end = start + interval
 dataset_name = "place_of_birth" # "trivia_qa" #"capitals"
 use_cache = True
 dataset_length = {
-    "privacy_inference": 1000, 
     "system_prompt": 1000,
+    "privacy_inference": 1000, 
     "user_prompt": 1000, 
     "regular_chat":1000
 }

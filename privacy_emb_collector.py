@@ -33,10 +33,11 @@ end = start + interval
 dataset_name = "place_of_birth" # "trivia_qa" #"capitals"
 use_cache = True
 dataset_length = {
-    "system_prompt": 1000,
+    # "system_prompt": 1000,
+    "regular_chat":1000,
+    "system_prompt_clinical": 1000,
     "privacy_inference": 1000, 
     "user_prompt": 1000, 
-    "regular_chat":1000
 }
 
 # IO
@@ -223,7 +224,14 @@ def compute_and_save_results():
             preprocessed_dataset = raw_dataset.map(preprocessing_function, load_from_cache_file=use_cache, num_proc=8)
             dataset_dict[dataset] = preprocessed_dataset
     for key, dataset in dataset_dict.items():
-        dataset_dict[key] = dataset.select(range(1000))
+        if key != "regular_chat":
+            shard_length = dataset_length[key] // 2
+            pos_dataset = dataset.filter(lambda x: x['label']==1).select(range(shard_length))
+            neg_dataset = dataset.filter(lambda x: x['label']==0).select(range(shard_length))
+            dataset_dict[key] = datasets.concatenate_datasets([pos_dataset, neg_dataset])
+        else:
+            dataset = dataset.filter(lambda x: x['res_start_idx']<=2500)
+            dataset_dict[key] = dataset.select(range(dataset_length[key]))
 
     # Prepare to save the internal states
     for name, module in model.named_modules():

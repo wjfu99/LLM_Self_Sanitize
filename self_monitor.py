@@ -13,18 +13,19 @@ from tqdm import tqdm
 
 gpu = "0"
 device = torch.device(f"cuda:{gpu}" if torch.cuda.is_available() else "cpu")
+class_num = 4
 batch_size = 128
 dropout_mlp = 0.5
 dropout_gru = 0.25
 learning_rate = 1e-4
 weight_decay = 1e-2
 
-inference_results = list(Path("./results/").rglob("*.pickle"))
-print (inference_results)
+# inference_results = list(Path("./results/").rglob("*.pickle"))
+# print (inference_results)
     
     
 class FFHallucinationClassifier(torch.nn.Module):
-    def __init__(self, input_shape, dropout = dropout_mlp):
+    def __init__(self, input_shape, output_shape = class_num, dropout = dropout_mlp):
         super().__init__()
         self.dropout = dropout
         
@@ -32,7 +33,7 @@ class FFHallucinationClassifier(torch.nn.Module):
             torch.nn.Linear(input_shape, 256),
             torch.nn.ReLU(),
             torch.nn.Dropout(self.dropout),
-            torch.nn.Linear(256, 3)
+            torch.nn.Linear(256, output_shape)
             )
 
     def forward(self, x):
@@ -54,6 +55,7 @@ class RNNHallucinationClassifier(torch.nn.Module):
     
 def gen_classifier_roc(inputs, numeric_label):
     X_train, X_test, y_train, y_test = train_test_split(inputs, numeric_label, test_size = 0.2, random_state=123)
+    
     classifier_model = FFHallucinationClassifier(X_train.shape[1]).to(device)
     X_train = torch.tensor(X_train).to(device)
     y_train = torch.tensor(y_train).to(torch.long).to(device)
@@ -75,41 +77,28 @@ def gen_classifier_roc(inputs, numeric_label):
         prediction_classes = torch.argmax(pred, dim=1).cpu()
         return roc_auc_score(y_test.cpu(), pred.cpu(), multi_class='ovr'), (prediction_classes.numpy() == y_test.cpu().numpy()).mean()
     
-    
-all_results = {}
 
+results_file = "./results/Llama-2-13b-chat-hf_place_of_birth_start-0_end-2500_3_7.pickle"    
+classifier_results = {}
+with open(results_file, "rb") as infile:
+    results = pickle.loads(infile.read())
+label = np.array(results['label'])
+label_encoder = LabelEncoder()
+numeric_label = label_encoder.fit_transform(label)
 
-for idx, results_file in enumerate(tqdm(inference_results)):
-    if results_file not in all_results.keys():
-        try:
-            del results
-        except:
-            pass
-        try:
-            classifier_results = {}
-            with open(results_file, "rb") as infile:
-                results = pickle.loads(infile.read())
-            label = np.array(results['label'])
-            label_encoder = LabelEncoder()
-            numeric_label = label_encoder.fit_transform(label)
+# fully connected
+for layer in range(results['first_fully_connected'][0].shape[0]):
+    emb_lab = [(emb[layer], label.repeat(emb[layer].shape[0]))for emb, label in zip(results['first_fully_connected'], numeric_label)]
+    features = np.concatenate([i[0] for i in emb_lab])
+    labels = np.concatenate([i[1] for i in emb_lab])
+    layer_roc, layer_acc = gen_classifier_roc(features, labels)
+    classifier_results[f'first_fully_connected_roc_{layer}'] = layer_roc
+    classifier_results[f'first_fully_connected_acc_{layer}'] = layer_acc
 
-            # fully connected
-            for layer in range(results['first_fully_connected'][0].shape[0]):
-                layer_roc, layer_acc = gen_classifier_roc(np.stack([i[layer] for i in results['first_fully_connected']]), numeric_label)
-                classifier_results[f'first_fully_connected_roc_{layer}'] = layer_roc
-                classifier_results[f'first_fully_connected_acc_{layer}'] = layer_acc
+# attention
+# for layer in range(results['first_attention'][0].shape[0]):
+#     layer_roc, layer_acc = gen_classifier_roc(np.stack([i[layer] for i in results['first_attention']]), numeric_label)
+#     classifier_results[f'first_attention_roc_{layer}'] = layer_roc
+#     classifier_results[f'first_attention_acc_{layer}'] = layer_acc
 
-            # attention
-            for layer in range(results['first_attention'][0].shape[0]):
-                layer_roc, layer_acc = gen_classifier_roc(np.stack([i[layer] for i in results['first_attention']]), numeric_label)
-                classifier_results[f'first_attention_roc_{layer}'] = layer_roc
-                classifier_results[f'first_attention_acc_{layer}'] = layer_acc
-            
-            all_results[results_file] = classifier_results.copy()
-        except Exception as err:
-            print(err)
-            
-print(all_results.keys())
-
-for k,v in all_results.items():
-    print(k, v)
+print(classifier_results)

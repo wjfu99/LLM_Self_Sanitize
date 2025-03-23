@@ -190,7 +190,7 @@ user_prompt_list = list(map(user_prompt_template.format, user_shift(text_list)))
 assistant_reponse_list = list(map(get_response, user_shift(entities_list)))
 
 attacker_prompt_list = [attack_prompt] * len(text_list)
-extracted_response_list = list(map(get_att_reponse, user_shift(text_list), user_shift(entities_list)))
+extracted_response_list = list(map(get_att_reponse, text_list, entities_list))
 
 def prepare_messages(system_prompt_list, user_prompt_list, assistant_reponse_list):
     all_messages = []

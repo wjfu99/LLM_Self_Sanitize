@@ -2,7 +2,7 @@ import functools
 from utils import data_preprocess
 import torch
 import datasets
-from transformers import AutoTokenizer, AutoModelForCausalLM, AutoModelForSeq2SeqLM, LlamaTokenizer, LlamaForCausalLM, Pipeline
+from transformers import AutoTokenizer, AutoModelForCausalLM, AutoModelForSeq2SeqLM, LlamaTokenizer, LlamaForCausalLM, Pipeline, DynamicCache
 
 use_cache = True
 model_name = "Llama-2-13b-chat-hf" #"opt-30b"
@@ -63,8 +63,24 @@ for key, dataset in dataset_dict.items():
         dataset = dataset.filter(lambda x: x['res_start_idx']<=2500)
         dataset_dict[key] = dataset.select(range(dataset_length[key]))
         
+
+# TODO: Accelerate with larger batch size
 for key, dataset in dataset_dict.items():
     for entry in dataset:
-        input_ids = torch.tensor([entry["input_ids"]]).to(device)
-        output = model.generate(input_ids)
-        
+        with torch.inference_mode():
+            messages = entry["messages"][:-1]
+            assert messages[-1]["role"] == "user"
+            inputs = tokenizer.apply_chat_template(messages, add_generation_prompt=True, return_tensors="pt", return_dict=True).to(model.device)
+            unfinished_sequences = True
+            past_key_values = DynamicCache()
+            max_cache_length = past_key_values.get_max_cache_shape()
+            original_input_ids = inputs["input_ids"].clone()
+            input_length = original_input_ids.shape[1]
+            while unfinished_sequences:
+                outputs = model.generate(**inputs, past_key_values=past_key_values, max_new_tokens=1, output_hidden_states=True, return_dict_in_generate=True)
+                inputs["input_ids"] = outputs["sequences"]
+                inputs["attention_mask"] = torch.ones_like(outputs["sequences"])
+                if outputs["sequences"][0, -1] == tokenizer.eos_token_id:
+                    break
+                # completion = tokenizer.decode(outputs["sequences"][0, input_length: ], skip_special_tokens=True)
+                # unfinished_sequences = stopping_criteria(input_ids, scores)

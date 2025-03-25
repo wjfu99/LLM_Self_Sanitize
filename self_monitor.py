@@ -8,6 +8,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.metrics import roc_auc_score
 from sklearn.preprocessing import LabelEncoder
 import random
+from utils import FFSelfMonitor
 
 from tqdm import tqdm
 
@@ -22,23 +23,6 @@ weight_decay = 1e-2
 
 # inference_results = list(Path("./results/").rglob("*.pickle"))
 # print (inference_results)
-    
-    
-class FFHallucinationClassifier(torch.nn.Module):
-    def __init__(self, input_shape, output_shape = class_num, dropout = dropout_mlp):
-        super().__init__()
-        self.dropout = dropout
-        
-        self.linear_relu_stack =torch.nn.Sequential(
-            torch.nn.Linear(input_shape, 256),
-            torch.nn.ReLU(),
-            torch.nn.Dropout(self.dropout),
-            torch.nn.Linear(256, output_shape)
-            )
-
-    def forward(self, x):
-        logits = self.linear_relu_stack(x)
-        return logits
     
 class RNNHallucinationClassifier(torch.nn.Module):
     def __init__(self, dropout=dropout_gru):
@@ -56,7 +40,7 @@ class RNNHallucinationClassifier(torch.nn.Module):
 def gen_classifier_roc(inputs, numeric_label):
     X_train, X_test, y_train, y_test = train_test_split(inputs, numeric_label, test_size = 0.2, random_state=123)
     
-    classifier_model = FFHallucinationClassifier(X_train.shape[1]).to(device)
+    classifier_model = FFSelfMonitor(X_train.shape[1]).to(device)
     X_train = torch.tensor(X_train).to(device)
     y_train = torch.tensor(y_train).to(torch.long).to(device)
     X_test = torch.tensor(X_test).to(device)

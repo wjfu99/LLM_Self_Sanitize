@@ -14,6 +14,22 @@ import warnings
 random.seed(0)
 
 
+class FFSelfMonitor(torch.nn.Module):
+    def __init__(self, input_shape, output_shape, dropout = 0.5):
+        super().__init__()
+        self.dropout = dropout
+        
+        self.linear_relu_stack =torch.nn.Sequential(
+            torch.nn.Linear(input_shape, 256),
+            torch.nn.ReLU(),
+            torch.nn.Dropout(self.dropout),
+            torch.nn.Linear(256, output_shape)
+            )
+
+    def forward(self, x):
+        logits = self.linear_relu_stack(x)
+        return logits
+
 def data_preprocess(example, tokenizer, min_res_len=5, max_res_len=50):
     
     messages = example["messages"]

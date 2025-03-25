@@ -4,6 +4,7 @@ import torch
 import datasets
 from transformers import AutoTokenizer, AutoModelForCausalLM, AutoModelForSeq2SeqLM, LlamaTokenizer, LlamaForCausalLM, Pipeline, DynamicCache
 import random
+from tqdm import tqdm
 
 use_cache = True
 model_name = "Llama-2-13b-chat-hf" #"opt-30b"
@@ -76,8 +77,10 @@ for key, dataset in dataset_dict.items():
     if key != "system_prompt_clinical":
         continue
     else:
-        dataset = dataset.filter(lambda x: x['label']==1).select(range(100))
-    for entry in dataset:
+        dataset = dataset.filter(lambda x: x['label']==1).select(range(10))
+        
+    accomplished_messages_list = []
+    for entry in tqdm(dataset):
         with torch.inference_mode():
             messages = entry["messages"][:-1]
             assert messages[-1]["role"] == "user"
@@ -95,6 +98,9 @@ for key, dataset in dataset_dict.items():
                 inputs["input_ids"] = outputs["sequences"]
                 inputs["attention_mask"] = torch.ones_like(outputs["sequences"])
                 if outputs["sequences"][0, -1] == tokenizer.eos_token_id:
+                    response = tokenizer.decode(outputs["sequences"][0, input_length:], skip_special_tokens=True)
+                    messages = messages + [{"role": "assistant", "content": response}]
+                    unfinished_sequences = False
                     break
                 if self_monitor == True and outputs["sequences"].shape[1] - input_length == self_monitor_tokens:
                     interrupted_message = tokenizer.decode(outputs["sequences"][0, input_length:], skip_special_tokens=True)
@@ -105,9 +111,12 @@ for key, dataset in dataset_dict.items():
                     inputs = tokenizer.apply_chat_template(messages, add_generation_prompt=True, return_tensors="pt", return_dict=True).to(model.device)
                     inputs["input_ids"] = inputs["input_ids"][:, :-1]
                     inputs["attention_mask"] = torch.ones_like(inputs["input_ids"])
+                    input_length = inputs["input_ids"].shape[1]
+                    self_monitor = False
                     self_repair_count += 1
                     assert self_repair_count <= 1
                     continue
-                    
+            accomplished_messages_list.append(messages)
+    dataset = dataset.add_column("accomplished_messages", accomplished_messages_list)
                 # completion = tokenizer.decode(outputs["sequences"][0, input_length: ], skip_special_tokens=True)
                 # unfinished_sequences = stopping_criteria(input_ids, scores)

@@ -3,6 +3,7 @@ from utils import data_preprocess
 import torch
 import datasets
 from transformers import AutoTokenizer, AutoModelForCausalLM, AutoModelForSeq2SeqLM, LlamaTokenizer, LlamaForCausalLM, Pipeline, DynamicCache
+import random
 
 use_cache = True
 model_name = "Llama-2-13b-chat-hf" #"opt-30b"
@@ -72,25 +73,30 @@ for key, dataset in dataset_dict.items():
 # TODO: Accelerate with larger batch size
 # TODO: Add regurgitation mechanism for self-repair
 for key, dataset in dataset_dict.items():
+    if key != "system_prompt_clinical":
+        continue
+    else:
+        dataset = dataset.filter(lambda x: x['label']==1).select(range(100))
     for entry in dataset:
         with torch.inference_mode():
             messages = entry["messages"][:-1]
             assert messages[-1]["role"] == "user"
             inputs = tokenizer.apply_chat_template(messages, add_generation_prompt=True, return_tensors="pt", return_dict=True).to(model.device)
             unfinished_sequences = True
-            self_monitor = False
+            self_monitor = True
             past_key_values = DynamicCache()
             max_cache_length = past_key_values.get_max_cache_shape()
             original_input_ids = inputs["input_ids"].clone()
             input_length = original_input_ids.shape[1]
             self_repair_count = 0
+            self_monitor_tokens = random.randint(5, 10)
             while unfinished_sequences:
                 outputs = model.generate(**inputs, past_key_values=past_key_values, max_new_tokens=1, output_hidden_states=True, return_dict_in_generate=True)
                 inputs["input_ids"] = outputs["sequences"]
                 inputs["attention_mask"] = torch.ones_like(outputs["sequences"])
                 if outputs["sequences"][0, -1] == tokenizer.eos_token_id:
                     break
-                if self_monitor == True:
+                if self_monitor == True and outputs["sequences"].shape[1] - input_length == self_monitor_tokens:
                     interrupted_message = tokenizer.decode(outputs["sequences"][0, input_length:], skip_special_tokens=True)
                     # regurgitated_message = tokenizer.decode(original_input_ids[0, input_length:-regurgitant_tokens], skip_special_tokens=True)
                     messages = messages + [{"role": "assistant", "content": interrupted_message}]

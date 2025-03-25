@@ -75,10 +75,11 @@ def gen_classifier_roc(inputs, numeric_label):
     with torch.no_grad():
         pred = torch.nn.functional.softmax(classifier_model(X_test), dim=1)
         prediction_classes = torch.argmax(pred, dim=1).cpu()
-        return roc_auc_score(y_test.cpu(), pred.cpu(), multi_class='ovr'), (prediction_classes.numpy() == y_test.cpu().numpy()).mean()
+    torch.save(classifier_model.state_dict(), "./self_monitor_models/classifier_model_layer{}.pth".format(layer))
+    return roc_auc_score(y_test.cpu(), pred.cpu(), multi_class='ovr'), (prediction_classes.numpy() == y_test.cpu().numpy()).mean()
     
 
-results_file = "./results/Llama-2-13b-chat-hf_place_of_birth_start-0_end-2500_3_7.pickle"    
+results_file = "./results/Llama-2-13b-chat-hf_place_of_birth_start-0_end-2500_3_23.pickle"    
 classifier_results = {}
 with open(results_file, "rb") as infile:
     results = pickle.loads(infile.read())

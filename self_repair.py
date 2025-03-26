@@ -1,14 +1,19 @@
 import functools
-from utils import data_preprocess
+from utils import data_preprocess, FFSelfMonitor, prepare_model_info, save_fully_connected_hidden, save_attention_hidden
 import torch
 import datasets
 from transformers import AutoTokenizer, AutoModelForCausalLM, AutoModelForSeq2SeqLM, LlamaTokenizer, LlamaForCausalLM, Pipeline, DynamicCache
+from collections import defaultdict
+import numpy as np
 import random
 from tqdm import tqdm
+import re
 
 use_cache = True
 model_name = "Llama-2-13b-chat-hf" #"opt-30b"
-model_repos = "meta-llama"
+self_monitor_layer = 36
+model_info = prepare_model_info(model_name, self_monitor_layer)
+model_repos = model_info[0]
 dataset_length = {
     # "system_prompt": 1000,
     "regular_chat":1000,
@@ -43,12 +48,32 @@ regurgitant_tokens = 5
 #         best_class = model_outputs["logits"].softmax(-1)
 #         return best_class
 
-
+# load the model and tokenizer
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
 model = AutoModelForCausalLM.from_pretrained(f'{model_repos}/{model_name}', device_map=device)
 tokenizer = AutoTokenizer.from_pretrained(f'{model_repos}/{model_name}')
 
+# register hook to save the internal states
+# ff_hook = {}
+ff_reps = defaultdict(list)
+named_modules = dict(model.named_modules())
+monitored_module_name = model_info[1]
+monitored_module = named_modules[monitored_module_name]
+ff_hook = monitored_module.register_forward_hook(functools.partial(save_fully_connected_hidden, save_dict=ff_reps, layer_name=monitored_module_name))
+# for name, module in model.named_modules():
+#     if re.match(f'{model_info[1]}$', name):
+#         ff_hook = module.register_forward_hook(functools.partial(save_fully_connected_hidden, save_dict=ff_reps, layer_name=name))
+#         module_name = name
+        # monitored_module = module
+    # if re.match(f'{model_repos[model_name][2]}$', name):
+    #     attention_forward_handles[name] = module.register_forward_hook(functools.partial(save_attention_hidden, name))
+    
+# load the self-monitor model
+# TODO: Multiple heads self-monitor
+monitor_dimention = monitored_module.out_features
+sm_model = FFSelfMonitor(input_shape=monitor_dimention).to(device)
+sm_model.load_state_dict(torch.load("./self_monitor_models/classifier_model_layer3.pth"))
+sm_model.eval()
 # Load the datasets
 dataset_list = dataset_length.keys()
 dataset_dict = {}

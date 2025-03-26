@@ -11,11 +11,12 @@ import csv
 from transformers import AutoTokenizer, AutoModelForCausalLM
 from huggingface_hub import login
 import warnings
+from typing import Union
 random.seed(0)
 
-
+# The class of self-monitor model
 class FFSelfMonitor(torch.nn.Module):
-    def __init__(self, input_shape, output_shape, dropout = 0.5):
+    def __init__(self, input_shape, output_shape=4, dropout = 0.5):
         super().__init__()
         self.dropout = dropout
         
@@ -29,6 +30,27 @@ class FFSelfMonitor(torch.nn.Module):
     def forward(self, x):
         logits = self.linear_relu_stack(x)
         return logits
+
+def prepare_model_info(model_name, layer_number: Union[int, str]=-1):
+    coll_str = "[0-9]+" if layer_number==-1 else str(layer_number)
+    model_info = {
+        "falcon-40b" : ("tiiuae", f".*transformer.h.{coll_str}.mlp.dense_4h_to_h", f".*transformer.h.{coll_str}.self_attention.dense"),
+        "falcon-7b" : ("tiiuae", f".*transformer.h.{coll_str}.mlp.dense_4h_to_h", f".*transformer.h.{coll_str}.self_attention.dense"),
+        "falcon-7b-instruct" : ("tiiuae", f".*transformer.h.{coll_str}.mlp.dense_4h_to_h", f".*transformer.h.{coll_str}.self_attention.dense"),
+        "open_llama_13b" : ("openlm-research", f".*model.layers.{coll_str}.mlp.up_proj", f".*model.layers.{coll_str}.self_attn.o_proj"),
+        "open_llama_7b" : ("openlm-research", f".*model.layers.{coll_str}.mlp.up_proj", f".*model.layers.{coll_str}.self_attn.o_proj"),
+        "opt-6.7b" : ("facebook", f".*model.decoder.layers.{coll_str}.fc2", f".*model.decoder.layers.{coll_str}.self_attn.out_proj"),
+        "opt-30b" : ("facebook", f".*model.decoder.layers.{coll_str}.fc2", f".*model.decoder.layers.{coll_str}.self_attn.out_proj", ),
+        "Llama-2-13b-chat-hf": ("meta-llama", f"model.layers.{coll_str}.mlp.up_proj", f".*model.layers.{coll_str}.self_attn.o_proj")
+    }
+    return model_info[model_name]
+    
+def save_fully_connected_hidden(save_dict, layer_name, mod, inp, out):
+    save_dict[layer_name].append(out.squeeze().detach().to(torch.float32).cpu().numpy())
+
+
+def save_attention_hidden(save_dict, layer_name, mod, inp, out):
+    save_dict[layer_name].append(out.squeeze().detach().to(torch.float32).cpu().numpy())
 
 def data_preprocess(example, tokenizer, min_res_len=5, max_res_len=50):
     

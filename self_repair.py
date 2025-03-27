@@ -1,6 +1,7 @@
 import functools
 from utils import data_preprocess, FFSelfMonitor, prepare_model_info, save_fully_connected_hidden, save_attention_hidden
 import torch
+from torch.nn import functional as F
 import datasets
 from transformers import AutoTokenizer, AutoModelForCausalLM, AutoModelForSeq2SeqLM, LlamaTokenizer, LlamaForCausalLM, Pipeline, DynamicCache
 from collections import defaultdict
@@ -11,7 +12,7 @@ import re
 
 use_cache = True
 model_name = "Llama-2-13b-chat-hf" #"opt-30b"
-self_monitor_layer = 36
+self_monitor_layer = 35
 model_info = prepare_model_info(model_name, self_monitor_layer)
 model_repos = model_info[0]
 dataset_length = {
@@ -55,11 +56,14 @@ tokenizer = AutoTokenizer.from_pretrained(f'{model_repos}/{model_name}')
 
 # register hook to save the internal states
 # ff_hook = {}
-ff_reps = defaultdict(list)
+# def save_fully_connected_hidden(layer_name, mod, inp, out):
+#     ff_reps[layer_name].append(out.squeeze().detach().to(torch.float32).cpu().numpy())
+# ff_reps = defaultdict(list)
+ff_rep = {}
 named_modules = dict(model.named_modules())
 monitored_module_name = model_info[1]
 monitored_module = named_modules[monitored_module_name]
-ff_hook = monitored_module.register_forward_hook(functools.partial(save_fully_connected_hidden, save_dict=ff_reps, layer_name=monitored_module_name))
+ff_hook = monitored_module.register_forward_hook(functools.partial(save_fully_connected_hidden, hidden=ff_rep, layer_name=monitored_module_name))
 # for name, module in model.named_modules():
 #     if re.match(f'{model_info[1]}$', name):
 #         ff_hook = module.register_forward_hook(functools.partial(save_fully_connected_hidden, save_dict=ff_reps, layer_name=name))
@@ -72,8 +76,9 @@ ff_hook = monitored_module.register_forward_hook(functools.partial(save_fully_co
 # TODO: Multiple heads self-monitor
 monitor_dimention = monitored_module.out_features
 sm_model = FFSelfMonitor(input_shape=monitor_dimention).to(device)
-sm_model.load_state_dict(torch.load("./self_monitor_models/classifier_model_layer3.pth"))
+sm_model.load_state_dict(torch.load("./self_monitor_models/classifier_model_layer3.pth", weights_only=True))
 sm_model.eval()
+
 # Load the datasets
 dataset_list = dataset_length.keys()
 dataset_dict = {}
@@ -108,18 +113,19 @@ for key, dataset in dataset_dict.items():
     for entry in tqdm(dataset):
         with torch.inference_mode():
             messages = entry["messages"][:-1]
-            assert messages[-1]["role"] == "user"
+            assert messages[-1]["role"] == "user" 
             inputs = tokenizer.apply_chat_template(messages, add_generation_prompt=True, return_tensors="pt", return_dict=True).to(model.device)
             unfinished_sequences = True
-            self_monitor = True
             past_key_values = DynamicCache()
             max_cache_length = past_key_values.get_max_cache_shape()
             original_input_ids = inputs["input_ids"].clone()
             input_length = original_input_ids.shape[1]
             self_repair_count = 0
-            self_monitor_tokens = random.randint(5, 10)
             while unfinished_sequences:
                 outputs = model.generate(**inputs, past_key_values=past_key_values, max_new_tokens=1, output_hidden_states=True, return_dict_in_generate=True)
+                # TODO: Conduct the self-monitor every N tokens
+                # inject the self-monitor process for each tokens
+                sm_model(ff_rep["current"])
                 inputs["input_ids"] = outputs["sequences"]
                 inputs["attention_mask"] = torch.ones_like(outputs["sequences"])
                 if outputs["sequences"][0, -1] == tokenizer.eos_token_id:
@@ -127,7 +133,8 @@ for key, dataset in dataset_dict.items():
                     messages = messages + [{"role": "assistant", "content": response}]
                     unfinished_sequences = False
                     break
-                if self_monitor == True and outputs["sequences"].shape[1] - input_length == self_monitor_tokens:
+                
+                if False:
                     interrupted_message = tokenizer.decode(outputs["sequences"][0, input_length:], skip_special_tokens=True)
                     # regurgitated_message = tokenizer.decode(original_input_ids[0, input_length:-regurgitant_tokens], skip_special_tokens=True)
                     messages = messages + [{"role": "assistant", "content": interrupted_message}]

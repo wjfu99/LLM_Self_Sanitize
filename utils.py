@@ -44,12 +44,15 @@ def prepare_model_info(model_name, layer_number: Union[int, str]=-1):
         "Llama-2-13b-chat-hf": ("meta-llama", f"model.layers.{coll_str}.mlp.up_proj", f".*model.layers.{coll_str}.self_attn.o_proj")
     }
     return model_info[model_name]
+
+def save_fully_connected_hidden(mod, inp, out, hidden, layer_name):
+    hidden["current"] = out.squeeze().detach()
     
-def save_fully_connected_hidden(save_dict, layer_name, mod, inp, out):
-    save_dict[layer_name].append(out.squeeze().detach().to(torch.float32).cpu().numpy())
+# def save_fully_connected_hidden(mod, inp, out, save_dict, layer_name):
+#     save_dict[layer_name].append(out.squeeze().detach().to(torch.float32).cpu().numpy())
 
 
-def save_attention_hidden(save_dict, layer_name, mod, inp, out):
+def save_attention_hidden(mod, inp, out, save_dict, layer_name):
     save_dict[layer_name].append(out.squeeze().detach().to(torch.float32).cpu().numpy())
 
 def data_preprocess(example, tokenizer, min_res_len=5, max_res_len=50):

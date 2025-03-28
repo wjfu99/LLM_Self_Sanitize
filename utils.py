@@ -41,12 +41,14 @@ def prepare_model_info(model_name, layer_number: Union[int, str]=-1):
         "open_llama_7b" : ("openlm-research", f".*model.layers.{coll_str}.mlp.up_proj", f".*model.layers.{coll_str}.self_attn.o_proj"),
         "opt-6.7b" : ("facebook", f".*model.decoder.layers.{coll_str}.fc2", f".*model.decoder.layers.{coll_str}.self_attn.out_proj"),
         "opt-30b" : ("facebook", f".*model.decoder.layers.{coll_str}.fc2", f".*model.decoder.layers.{coll_str}.self_attn.out_proj", ),
-        "Llama-2-13b-chat-hf": ("meta-llama", f"model.layers.{coll_str}.mlp.up_proj", f".*model.layers.{coll_str}.self_attn.o_proj")
+        "Llama-2-13b-chat-hf": ("meta-llama", f"model.layers.{coll_str}.mlp.up_proj", f".*model.layers.{coll_str}.self_attn.o_proj"),
+        "Llama-3.1-8B-Instruct": ("meta-llama", f"model.layers.{coll_str}.mlp.up_proj", f".*model.layers.{coll_str}.self_attn.o_proj"),
     }
     return model_info[model_name]
 
 def save_fully_connected_hidden(mod, inp, out, hidden, layer_name):
-    hidden["current"] = out.squeeze().detach()
+    # Out size: (batch_size, seq_len, hidden_size)
+    hidden["current"] = out[0, -1, :].squeeze().detach()
     
 # def save_fully_connected_hidden(mod, inp, out, save_dict, layer_name):
 #     save_dict[layer_name].append(out.squeeze().detach().to(torch.float32).cpu().numpy())

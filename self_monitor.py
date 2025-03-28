@@ -67,9 +67,8 @@ results_file = "./results/Llama-2-13b-chat-hf_place_of_birth_start-0_end-2500_3_
 classifier_results = {}
 with open(results_file, "rb") as infile:
     results = pickle.loads(infile.read())
-label = np.array(results['label'])
-label_encoder = LabelEncoder()
-numeric_label = label_encoder.fit_transform(label)
+label_mapping = {"regular_chat": 0, "system_prompt_clinical": 1, "privacy_inference": 2, "user_prompt": 3}
+numeric_label = np.array([label_mapping[i] for i in results['label']])
 
 # fully connected
 for layer in range(results['first_fully_connected'][0].shape[0]):

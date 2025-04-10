@@ -108,9 +108,12 @@ for key, dataset in dataset_dict.items():
     if key != "system_prompt_clinical":
         continue
     else:
-        dataset = dataset.filter(lambda x: x['label']==1).select(range(10))
+        dataset = dataset.filter(lambda x: x['label']==1).select(range(50))
         
     accomplished_messages_list = []
+    self_monitor_tokens_list = []
+    self_monitor_scores_list = []
+    interrupted_message_list = []
     for entry in tqdm(dataset):
         with torch.inference_mode():
             messages = entry["messages"][:-1]
@@ -123,6 +126,9 @@ for key, dataset in dataset_dict.items():
             input_length = original_input_ids.shape[1]
             self_repair_count = 0
             prob_cache = []
+            self_monitor_tokens = -1
+            self_monitor_scores = -1
+            interrupted_message = None
             while unfinished_sequences:
                 outputs = model.generate(**inputs, past_key_values=past_key_values, max_new_tokens=1, output_hidden_states=True, return_dict_in_generate=True)
                 
@@ -132,8 +138,10 @@ for key, dataset in dataset_dict.items():
                 prob_cache.append(prob)
                 prob_queue = np.array(prob_cache[-5:])
                 # TODO: Maybe we can use prob_queue.mean(axis=0)[1:].sum() to deploy a more flexible self-monitor criteria
-                self_monitor_criteria = (prob_queue.mean(axis=0)[1:].max() > 0.7 or prob_queue[-1, 1:].max() > 0.9)
+                self_monitor_criteria = prob_queue.mean(axis=0)[1:].max() > 0.9 # or prob_queue[-1, 1:].max() > 0.9
                 if self_monitor_criteria and self_repair_count == 0:
+                    self_monitor_tokens = len(outputs["sequences"][0, input_length:])
+                    self_monitor_scores = prob_queue.mean(axis=0)[1:].max()
                     interrupted_message = tokenizer.decode(outputs["sequences"][0, input_length:], skip_special_tokens=True)
                     # regurgitated_message = tokenizer.decode(original_input_ids[0, input_length:-regurgitant_tokens], skip_special_tokens=True)
                     messages = messages + [{"role": "assistant", "content": interrupted_message}]
@@ -151,16 +159,20 @@ for key, dataset in dataset_dict.items():
                     self_repair_count += 1
                     assert self_repair_count <= 1
                     continue
-                
+                # prepare the input_ids for the next round
                 inputs["input_ids"] = outputs["sequences"]
                 inputs["attention_mask"] = torch.ones_like(outputs["sequences"])
+                # check if the sequence is finished
                 if outputs["sequences"][0, -1] == tokenizer.eos_token_id:
                     response = tokenizer.decode(outputs["sequences"][0, input_length:], skip_special_tokens=True)
                     messages = messages + [{"role": "assistant", "content": response}]
                     unfinished_sequences = False
                     break
-
+            # save the results for each entry
             accomplished_messages_list.append(messages)
+            self_monitor_tokens_list.append(self_monitor_tokens)
+            self_monitor_scores_list.append(self_monitor_scores)
+            interrupted_message_list.append(interrupted_message)
     dataset = dataset.add_column("accomplished_messages", accomplished_messages_list)
                 # completion = tokenizer.decode(outputs["sequences"][0, input_length: ], skip_special_tokens=True)
                 # unfinished_sequences = stopping_criteria(input_ids, scores)

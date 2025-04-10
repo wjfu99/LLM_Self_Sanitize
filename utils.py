@@ -46,6 +46,12 @@ def prepare_model_info(model_name, layer_number: Union[int, str]=-1):
     }
     return model_info[model_name]
 
+def print_chat(messages):
+    for m in messages:
+        print(f"{m['role']}======================================================")
+        print(f"{m['content']}")
+    print("\n\n")
+
 def save_fully_connected_hidden(mod, inp, out, hidden, layer_name):
     # Out size: (batch_size, seq_len, hidden_size)
     hidden["current"] = out[0, -1, :].squeeze().detach()

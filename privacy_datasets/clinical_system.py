@@ -137,8 +137,9 @@ def format_entities(text, entities):
         elif label == "test":
             test.append(entity)
     example = exapmple_template.format(text, repr(problem), repr(treatment), repr(test))
+    formatted_entity = assistant_response_template.format(repr(problem), repr(treatment), repr(test))
     system_prompt = system_prompt_template.format(example)
-    return system_prompt
+    return system_prompt, example, formatted_entity
 
 def get_att_reponse(text, entities):
     problem = []
@@ -183,7 +184,7 @@ for dir in bio_dirs:
             text_list.append(text)
             entities_list.append(entities)
 
-system_prompt_list = list(map(format_entities, text_list, entities_list))
+system_prompt_list, example_list, formatted_entities_list = list(zip(*list(map(format_entities, text_list, entities_list))))
 
 user_shift = lambda x: x[123:] + x[:123]
 user_prompt_list = list(map(user_prompt_template.format, user_shift(text_list)))
@@ -208,11 +209,17 @@ attack_messages = prepare_messages(system_prompt_list, attacker_prompt_list, ext
 
 regular_dataset = datasets.Dataset.from_dict({
     "messages": regular_messages,
-    "label": [0] * len(regular_messages)
+    "label": [0] * len(regular_messages),
+    "text": text_list,
+    "entities": formatted_entities_list,
+    "example": example_list,
 })
 attack_dataset = datasets.Dataset.from_dict({
     "messages": attack_messages,
-    "label": [1] * len(attack_messages)
+    "label": [1] * len(attack_messages),
+    "text": text_list,
+    "entities": formatted_entities_list,
+    "example": example_list,
 })
 all_dataset = datasets.concatenate_datasets([regular_dataset, attack_dataset])
 all_dataset.save_to_disk("./preprocessed/system_prompt_clinical")

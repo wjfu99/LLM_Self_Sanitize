@@ -1,5 +1,5 @@
 import functools
-from utils import data_preprocess, FFSelfMonitor, prepare_model_info, save_fully_connected_hidden, save_attention_hidden
+from utils import data_preprocess, FFSelfMonitor, prepare_model_info, save_fully_connected_hidden, save_attention_hidden, eval_rouge
 import torch
 from torch.nn import functional as F
 import datasets
@@ -10,6 +10,8 @@ import random
 from tqdm import tqdm
 import re
 from copy import deepcopy
+from nltk.translate.bleu_score import sentence_bleu
+from rouge_score import rouge_scorer
 
 use_cache = True
 model_name = "Llama-2-13b-chat-hf" #"opt-30b"
@@ -110,7 +112,8 @@ for key, dataset in dataset_dict.items():
         continue
     else:
         dataset = dataset.filter(lambda x: x['label']==1).select(range(50))
-        
+    
+    response_list = []
     accomplished_messages_list = []
     self_monitor_tokens_list = []
     self_monitor_scores_list = []
@@ -170,10 +173,13 @@ for key, dataset in dataset_dict.items():
                     unfinished_sequences = False
                     break
             # save the results for each entry
+            response_list.append(response)
             accomplished_messages_list.append(messages)
             self_monitor_tokens_list.append(self_monitor_tokens)
             self_monitor_scores_list.append(self_monitor_scores)
             interrupted_message_list.append(interrupted_message)
+    rouge_scores, _ = eval_rouge(response_list, dataset["entities"])
     dataset = dataset.add_column("accomplished_messages", accomplished_messages_list)
+    
                 # completion = tokenizer.decode(outputs["sequences"][0, input_length: ], skip_special_tokens=True)
                 # unfinished_sequences = stopping_criteria(input_ids, scores)

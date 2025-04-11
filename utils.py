@@ -12,7 +12,18 @@ from transformers import AutoTokenizer, AutoModelForCausalLM
 from huggingface_hub import login
 import warnings
 from typing import Union
+from rouge_score import rouge_scorer
 random.seed(0)
+
+
+def eval_rouge(generated, target):
+    scorer = rouge_scorer.RougeScorer(['rouge1', 'rouge2', 'rougeL'], use_stemmer=True)
+    raw_scores = [scorer.score(t, r) for r, t in zip(generated, target)]
+    avg_scores = {}
+    for key in raw_scores[0].keys():
+        avg_scores[key] = np.mean([score[key].fmeasure for score in raw_scores])
+    return avg_scores, raw_scores
+    # return scores
 
 # The class of self-monitor model
 class FFSelfMonitor(torch.nn.Module):

@@ -13,6 +13,8 @@ from huggingface_hub import login
 import warnings
 from typing import Union
 from rouge_score import rouge_scorer
+from nltk.translate.bleu_score import sentence_bleu
+import evaluate
 random.seed(0)
 
 
@@ -24,6 +26,12 @@ def eval_rouge(generated, target):
         avg_scores[key] = np.mean([score[key].fmeasure for score in raw_scores])
     return avg_scores, raw_scores
     # return scores
+
+def eval_bleu(generated, target, tokenizer=None):
+    scorer = evaluate.load("bleu", tokenizer=tokenizer)
+    scorer.add_batch(predictions=generated, references=target)
+    scores = scorer.compute()
+    return scores["bleu"]
 
 # The class of self-monitor model
 class FFSelfMonitor(torch.nn.Module):

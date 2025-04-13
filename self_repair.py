@@ -1,5 +1,5 @@
 import functools
-from utils import data_preprocess, FFSelfMonitor, prepare_model_info, save_fully_connected_hidden, save_attention_hidden, eval_rouge
+from utils import data_preprocess, FFSelfMonitor, prepare_model_info, save_fully_connected_hidden, save_attention_hidden, eval_rouge, eval_bleu
 import torch
 from torch.nn import functional as F
 import datasets
@@ -12,6 +12,7 @@ import re
 from copy import deepcopy
 from nltk.translate.bleu_score import sentence_bleu
 from rouge_score import rouge_scorer
+import evaluate
 
 use_cache = True
 model_name = "Llama-2-13b-chat-hf" #"opt-30b"
@@ -179,6 +180,7 @@ for key, dataset in dataset_dict.items():
             self_monitor_scores_list.append(self_monitor_scores)
             interrupted_message_list.append(interrupted_message)
     rouge_scores, _ = eval_rouge(response_list, dataset["entities"])
+    bleu_scores = eval_bleu(response_list, dataset["entities"])
     dataset = dataset.add_column("accomplished_messages", accomplished_messages_list)
     
                 # completion = tokenizer.decode(outputs["sequences"][0, input_length: ], skip_special_tokens=True)

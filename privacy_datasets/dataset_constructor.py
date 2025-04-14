@@ -2,14 +2,6 @@ import datasets
 import functools
 import argparse
 
-dataset_length = {
-    # "system_prompt": 1000,
-    "regular_chat": 1000,
-    "system_prompt_clinical": 1000,
-    "privacy_inference": 1000, 
-    "user_prompt": 1000, 
-}
-
 def length_filter(example, length=2000):
     messages = example["messages"]
     m_len = 0
@@ -41,7 +33,7 @@ for dataset in dataset_list:
 aio_dataset = {}
 for key, dataset in dataset_dict.items():
     if key != "regular_chat":
-        shard_length = dataset_length[key] // 2
+        shard_length = dataset_list[key] // 2
         pos_dataset = dataset.filter(lambda x: x['label']==1).select(range(shard_length))
         neg_dataset = dataset.filter(lambda x: x['label']==0).select(range(shard_length))
         pos_datasets = pos_dataset.train_test_split(test_size=args.test_size, shuffle=args.shuffle, seed=args.seed)
@@ -50,7 +42,7 @@ for key, dataset in dataset_dict.items():
         aio_dataset[key + "_test"] = datasets.concatenate_datasets([pos_datasets['test'], neg_datasets['test']])
     else:
         dataset = dataset.filter(functools.partial(length_filter, length=2000))
-        dataset = dataset.select(range(dataset_length[key])).train_test_split(test_size=args.test_size, shuffle=args.shuffle, seed=args.seed)
+        dataset = dataset.select(range(dataset_list[key])).train_test_split(test_size=args.test_size, shuffle=args.shuffle, seed=args.seed)
         aio_dataset[key + "_train"], aio_dataset[key + "_test"] = dataset["train"], dataset["test"]
         
         

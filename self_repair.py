@@ -186,6 +186,7 @@ for key, dataset in dataset_dict.items():
     dataset = dataset.add_column("interrupted_message", interrupted_message_list)
     dataset = dataset.add_column("self_monitor_tokens", self_monitor_tokens_list)
     dataset = dataset.add_column("self_monitor_scores", self_monitor_scores_list)
+    dataset_dict[key] = dataset
 
 dataset_dict = datasets.DatasetDict(dataset_dict)
 dataset_dict.save_to_disk(f"./privacy_datasets/self_repair_results/{model_repos}/{model_name}")

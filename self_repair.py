@@ -22,7 +22,7 @@ model_repos = model_info[0]
 dataset_length = {
     # "system_prompt": 1000,
     "regular_chat": 1000,
-    "system_prompt_clinical": 1000,
+    "system_prompt_clinical": 200,
     "privacy_inference": 1000, 
     "user_prompt": 1000, 
 }
@@ -111,8 +111,8 @@ for key, dataset in dataset_dict.items():
 for key, dataset in dataset_dict.items():
     if key != "system_prompt_clinical":
         continue
-    else:
-        dataset = dataset.filter(lambda x: x['label']==1).select(range(50))
+    # else:
+    #     dataset = dataset.filter(lambda x: x['label']==1).select(range(50))
     
     response_list = []
     accomplished_messages_list = []
@@ -179,9 +179,15 @@ for key, dataset in dataset_dict.items():
             self_monitor_tokens_list.append(self_monitor_tokens)
             self_monitor_scores_list.append(self_monitor_scores)
             interrupted_message_list.append(interrupted_message)
-    rouge_scores, _ = eval_rouge(response_list, dataset["entities"])
-    bleu_scores = eval_bleu(response_list, dataset["entities"])
+    # rouge_scores, _ = eval_rouge(response_list, dataset["entities"])
+    # bleu_scores = eval_bleu(response_list, dataset["entities"])
+    dataset = dataset.add_column("response", response_list)
     dataset = dataset.add_column("accomplished_messages", accomplished_messages_list)
-    
+    dataset = dataset.add_column("interrupted_message", interrupted_message_list)
+    dataset = dataset.add_column("self_monitor_tokens", self_monitor_tokens_list)
+    dataset = dataset.add_column("self_monitor_scores", self_monitor_scores_list)
+
+dataset_dict = datasets.DatasetDict(dataset_dict)
+dataset_dict.save_to_disk(f"./privacy_datasets/self_repair_results/{model_repos}/{model_name}")
                 # completion = tokenizer.decode(outputs["sequences"][0, input_length: ], skip_special_tokens=True)
                 # unfinished_sequences = stopping_criteria(input_ids, scores)

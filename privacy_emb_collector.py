@@ -21,9 +21,22 @@ from string import Template
 from dataset_constructor import create_dataset
 from utils import data_preprocess
 from huggingface_hub import login
+import argparse
+import utils
 
 # Hf credentials
 login("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")
+
+parser = argparse.ArgumentParser(description="Collect privacy embeddings")
+parser.add_argument("--datasets", type=str, nargs="+", default=["regular_chat", "system_prompt_clinical", "privacy_inference", "user_prompt"], help="List of datasets to construct")
+parser.add_argument("--datasets_length", type=int, nargs="+", default=[1000, 1000, 1000, 1000], help="List of dataset lengths")
+parser.add_argument("--aio_dataset", type=str, default="./privacy_datasets/preprocessed/aio", help="The dataset to use")
+parser.add_argument("--output_dir", type=str, default="./privacy_datasets/embeddings", help="The output directory for the dataset")
+parser.add_argument("--model_name", type=str, default="meta-llama/Llama-2-13b-chat-hf", help="The model name to use")
+parser.add_argument("--layer_number", type=int, nargs="+", default=[32, 33, 34, 35, 36], help="The layer number to use")
+parser.add_argument("--skip_res_tokens", type=int, default=0, help="The number of tokens to skip in the response")
+parser.add_argument("--max_monitor_tokens", type=int, default=50, help="The maximum number of tokens to monitor")
+args = parser.parse_args()
 
 # Data related params
 iteration = 0
@@ -32,48 +45,13 @@ start = iteration * interval
 end = start + interval
 dataset_name = "place_of_birth" # "trivia_qa" #"capitals"
 use_cache = True
-dataset_length = {
-    # "system_prompt": 1000,
-    "regular_chat":1000,
-    "system_prompt_clinical": 1000,
-    "privacy_inference": 1000, 
-    "user_prompt": 1000, 
-}
-
-# IO
-data_dir = Path(".") # Where our data files are stored
-results_dir = Path("./results/") # Directory for storing results
+dataset_length = dict(zip(args.datasets, args.datasets_length))
 
 # Hardware
 gpu = "0"
 device = torch.device(f"cuda:{gpu}" if torch.cuda.is_available() else "cpu")
 
-# Model
-model_name = "Llama-2-13b-chat-hf" #"opt-30b"
-layer_number = -1
-# hardcode below,for now. Could dig into all models but they take a while to load
-model_num_layers = {
-    "falcon-40b" : 60,
-    "falcon-7b" : 32,
-    "falcon-7b-instruct" : 32,
-    "open_llama_13b" : 40,
-    "open_llama_7b" : 32,
-    "opt-6.7b" : 32,
-    "opt-30b" : 48,
-    "Llama-2-13b-chat-hf": 32
-}
-assert layer_number < model_num_layers[model_name]
-coll_str = "[0-9]+" if layer_number==-1 else str(layer_number)
-model_repos = {
-    "falcon-40b" : ("tiiuae", f".*transformer.h.{coll_str}.mlp.dense_4h_to_h", f".*transformer.h.{coll_str}.self_attention.dense"),
-    "falcon-7b" : ("tiiuae", f".*transformer.h.{coll_str}.mlp.dense_4h_to_h", f".*transformer.h.{coll_str}.self_attention.dense"),
-    "falcon-7b-instruct" : ("tiiuae", f".*transformer.h.{coll_str}.mlp.dense_4h_to_h", f".*transformer.h.{coll_str}.self_attention.dense"),
-    "open_llama_13b" : ("openlm-research", f".*model.layers.{coll_str}.mlp.up_proj", f".*model.layers.{coll_str}.self_attn.o_proj"),
-    "open_llama_7b" : ("openlm-research", f".*model.layers.{coll_str}.mlp.up_proj", f".*model.layers.{coll_str}.self_attn.o_proj"),
-    "opt-6.7b" : ("facebook", f".*model.decoder.layers.{coll_str}.fc2", f".*model.decoder.layers.{coll_str}.self_attn.out_proj"),
-    "opt-30b" : ("facebook", f".*model.decoder.layers.{coll_str}.fc2", f".*model.decoder.layers.{coll_str}.self_attn.out_proj", ),
-    "Llama-2-13b-chat-hf": ("meta-llama", f".*model.layers.{coll_str}.mlp.up_proj", f".*model.layers.{coll_str}.self_attn.o_proj")
-}
+model_info = utils.prepare_model_info(args.model_name, ".*")
 
 # For storing results
 fully_connected_hidden_layers = defaultdict(list)
@@ -81,200 +59,72 @@ attention_hidden_layers = defaultdict(list)
 attention_forward_handles = {}
 fully_connected_forward_handles = {}
 
-
-def save_fully_connected_hidden(layer_name, mod, inp, out):
-    fully_connected_hidden_layers[layer_name].append(out.squeeze().detach().to(torch.float32).cpu().numpy())
-
-
-def save_attention_hidden(layer_name, mod, inp, out):
-    attention_hidden_layers[layer_name].append(out.squeeze().detach().to(torch.float32).cpu().numpy())
-
-
-def get_stop_token():
-    if "llama" in model_name:
-        stop_token = 13
-    elif "falcon" in model_name:
-        stop_token = 193
-    else:
-        stop_token = 50118
-    return stop_token
-
-
-def get_next_token(x, model):
-    with torch.no_grad():
-        return model(x).logits
-
-
-def generate_response(x, model, *, max_length=100, pbar=False):
-    response = []
-    bar = tqdm(range(max_length)) if pbar else range(max_length)
-    for step in bar:
-        logits = get_next_token(x, model)
-        next_token = logits.squeeze()[-1].argmax()
-        x = torch.concat([x, next_token.view(1, -1)], dim=1)
-        response.append(next_token)
-        if next_token == get_stop_token() and step>5:
-            break
-    return torch.stack(response).cpu().numpy(), logits.squeeze()
-
-
-def answer_question(question, model, tokenizer, *, max_length=100, pbar=False):
-    input_ids = tokenizer(question, return_tensors='pt').input_ids.to(device)
-    response, logits = generate_response(input_ids, model, max_length=max_length, pbar=pbar)
-    return response, logits, input_ids.shape[-1]
-
-
-def answer_trivia(question, targets, model, tokenizer):
-    response, logits, start_pos = answer_question(question, model, tokenizer)
-    str_response = tokenizer.decode(response, skip_special_tokens=True)
-    correct = False
-    for alias in targets:
-        if alias.lower() in str_response.lower():
-            correct = True
-            break
-    return response, str_response, logits, start_pos, correct
-
-
-def answer_trex(source, targets, model, tokenizer, question_template):
-    response, logits, start_pos = answer_question(question_template.substitute(source=source), model, tokenizer)
-    str_response = tokenizer.decode(response, skip_special_tokens=True)
-    correct = any([target.lower() in str_response.lower() for target in targets])
-    return response, str_response, logits, start_pos, correct
-
-
-def get_start_end_layer(model):
-    if "llama" in model_name.lower():
-        layer_count = model.model.layers
-    elif "falcon" in model_name:
-        layer_count = model.transformer.h
-    else:
-        layer_count = model.model.decoder.layers
-    layer_st = 0 if layer_number == -1 else layer_number
-    layer_en = len(layer_count) if layer_number == -1 else layer_number + 1
-    return layer_st, layer_en
-
-
-def collect_fully_connected(token_pos, layer_start, layer_end):
-    layer_name = model_repos[model_name][1][2:].split(coll_str)
-    first_activation = np.stack([fully_connected_hidden_layers[f'{layer_name[0]}{i}{layer_name[1]}'][-1][token_pos] \
-                                for i in range(layer_start, layer_end)])
-    final_activation = np.stack([fully_connected_hidden_layers[f'{layer_name[0]}{i}{layer_name[1]}'][-1][-1] \
-                                for i in range(layer_start, layer_end)])
-    return first_activation, final_activation
-
-
-def collect_attention(token_pos, layer_start, layer_end):
-    layer_name = model_repos[model_name][2][2:].split(coll_str)
-    first_activation = np.stack([attention_hidden_layers[f'{layer_name[0]}{i}{layer_name[1]}'][-1][token_pos] \
-                                for i in range(layer_start, layer_end)])
-    final_activation = np.stack([attention_hidden_layers[f'{layer_name[0]}{i}{layer_name[1]}'][-1][-1] \
-                                for i in range(layer_start, layer_end)])
-    return first_activation, final_activation
-
-
-def normalize_attributes(attributes: torch.Tensor) -> torch.Tensor:
-        # attributes has shape (batch, sequence size, embedding dim)
-        attributes = attributes.squeeze(0)
-
-        # if aggregation == "L2":  # norm calculates a scalar value (L2 Norm)
-        norm = torch.norm(attributes, dim=1)
-        attributes = norm / torch.sum(norm)  # Normalize the values so they add up to 1
-        
-        return attributes
-
-
-def model_forward(input_: torch.Tensor, model, extra_forward_args: Dict[str, Any]) \
-            -> torch.Tensor:
-        output = model(inputs_embeds=input_, **extra_forward_args)
-        return torch.nn.functional.softmax(output.logits[:, -1, :], dim=-1)
-
-
-def get_embedder(model):
-    if "falcon" in model_name:
-        return model.transformer.word_embeddings
-    elif "opt" in model_name:
-        return model.model.decoder.embed_tokens
-    elif "llama" in model_name:
-        return model.model.embed_tokens
-    else:
-        raise ValueError(f"Unknown model {model_name}")
-
+def fetch_selected_tokens(ff_rep, token_pos):
+    for layer_num in ff_rep.keys():
+        ff_rep[layer_num] = ff_rep[layer_num][token_pos]
+    return ff_rep
 
 def compute_and_save_results():
 
     # Model
-    tokenizer = AutoTokenizer.from_pretrained(f'{model_repos[model_name][0]}/{model_name}')
-    model = AutoModelForCausalLM.from_pretrained(f'{model_repos[model_name][0]}/{model_name}',
+    tokenizer = AutoTokenizer.from_pretrained(args.model_name)
+    model = AutoModelForCausalLM.from_pretrained(args.model_name,
                                          device_map=device,
                                          torch_dtype=torch.bfloat16,
                                          # load_in_4bit=True,
                                          trust_remote_code=True)
-    # forward_func = partial(model_forward, model=model, extra_forward_args={})
-    # embedder = get_embedder(model)
     
     # Load the datasets
-    dataset_list = dataset_length.keys()
-    dataset_dict = {}
-    preprocessing_function = functools.partial(data_preprocess, tokenizer=tokenizer)
-    for dataset in dataset_list:
-        if dataset == "regular_chat":
-            dataset_dict["regular_chat"] = load_dataset("HuggingFaceH4/ultrachat_200k", split="test_sft").map(preprocessing_function, load_from_cache_file=use_cache, num_proc=8)
-        else:
-            raw_dataset = datasets.load_from_disk(f"./privacy_datasets/preprocessed/{dataset}")
-            preprocessed_dataset = raw_dataset.map(preprocessing_function, load_from_cache_file=use_cache, num_proc=8)
-            dataset_dict[dataset] = preprocessed_dataset
-    for key, dataset in dataset_dict.items():
-        if key != "regular_chat":
-            shard_length = dataset_length[key] // 2
-            pos_dataset = dataset.filter(lambda x: x['label']==1).select(range(shard_length))
-            neg_dataset = dataset.filter(lambda x: x['label']==0).select(range(shard_length))
-            dataset_dict[key] = datasets.concatenate_datasets([pos_dataset, neg_dataset])
-        else:
-            dataset = dataset.filter(lambda x: x['res_start_idx']<=2500)
-            dataset_dict[key] = dataset.select(range(dataset_length[key]))
+    aio_dataset = datasets.load_from_disk(args.aio_dataset)
+    aio_dataset = aio_dataset.map(functools.partial(utils.add_input_ids, tokenizer=tokenizer))
+    aio_dataset = aio_dataset.map(functools.partial(utils.add_res_start_idx, tokenizer=tokenizer))
 
     # Prepare to save the internal states
+    ff_rep = {}
+    ff_hook = {}
     for name, module in model.named_modules():
-        if re.match(f'{model_repos[model_name][1]}$', name):
-            fully_connected_forward_handles[name] = module.register_forward_hook(
-                partial(save_fully_connected_hidden, name))
-        if re.match(f'{model_repos[model_name][2]}$', name):
-            attention_forward_handles[name] = module.register_forward_hook(partial(save_attention_hidden, name))
-    
-    # Dataset
-    # dataset_dict = create_dataset(tokenizer=tokenizer)
-    
-    # Generate results
-    results = defaultdict(list)
-    for key, dataset in dataset_dict.items():
-        for idx in tqdm(range(len(dataset))):
-            with torch.inference_mode():
-                fully_connected_hidden_layers.clear()
-                attention_hidden_layers.clear()
+        match = re.search(f'{model_info["ff"]}$', name)
+        if match:
+            layer_num = int(match.group(1))
+            if layer_num in args.layer_number:
+                ff_hook[layer_num] = module.register_forward_hook(partial(utils.save_ff_representation, ff_rep=ff_rep, layer_num=layer_num))
 
-                input_ids = torch.tensor([dataset[idx]["input_ids"]]).to(device)
+    # Generate results
+    out_dataset = {}
+    for key, dataset in aio_dataset.items():
+        match = re.match(r"([a-zA-Z0-9_]+)_(train|test)", key)
+        if match:
+            dataset_name = match.group(1)
+            split = match.group(2)
+            if split == "test":
+                continue
+        else:
+            raise ValueError(f"Invalid key format: {key}")
+        
+        results = defaultdict(list)
+        for idx in tqdm(range(len(dataset))):
+            entry = dataset[idx]
+            with torch.inference_mode():
+                ff_rep.clear()
+
+                input_ids = torch.tensor([entry["input_ids"]]).to(device)
                 qa_str = tokenizer.decode(input_ids[0], skip_special_tokens=True)
-                start_pos = dataset[idx]["res_start_idx"] + 5
+                start_pos = entry["res_start_idx"] + args.skip_res_tokens
                 length = len(input_ids[0])
-                end_pos = min(length, start_pos+50)
+                end_pos = min(length, start_pos+args.max_monitor_tokens)
                 input_ids = input_ids[:, :end_pos]
                 outputs = model(input_ids)
-                # response, str_response, logits, start_pos, correct = question_asker(question, answers, model, tokenizer)
-                # layer_start, layer_end = get_start_end_layer(model)
-                layer_start = 32
-                layer_end = 36
-                first_fully_connected, final_fully_connected = collect_fully_connected(range(start_pos, end_pos), layer_start, layer_end)
-                first_attention, final_attention = collect_attention(range(start_pos, end_pos), layer_start, layer_end)
+                ff_rep = fetch_selected_tokens(ff_rep, range(start_pos, end_pos))
 
                 results['qa_str'].append(qa_str)
                 results['start_pos'].append(start_pos)
-                results['label'].append(key)
-                results['first_fully_connected'].append(first_fully_connected)
-                # results['final_fully_connected'].append(final_fully_connected)
-                results['first_attention'].append(first_attention)
-                # results['final_attention'].append(final_attention)
-    with open(results_dir/f"{model_name}_{dataset_name}_start-{start}_end-{end}_{datetime.now().month}_{datetime.now().day}.pickle", "wb") as outfile:
-        outfile.write(pickle.dumps(results))
+                results['label'].append(entry['label'])
+                results['ff_rep'].append(ff_rep)
+        out_dataset[dataset_name] = datasets.Dataset.from_dict(results)
+    out_dataset = datasets.DatasetDict(out_dataset)
+    out_dataset.save_to_disk(f"{args.output_dir}/{args.model_name}_{datetime.now().month}_{datetime.now().day}")
+    # with open(f"{args.output_dir}/{args.model_name}_{datetime.now().month}_{datetime.now().day}.pickle", "wb") as outfile:
+    #     outfile.write(pickle.dumps(results))
 
 
 if __name__ == '__main__':

@@ -9,6 +9,10 @@ def length_filter(example, length=2000):
         m_len += len(message["content"].split())
     return m_len <= length
 
+def add_label(example):
+    example["label"] = 0
+    return example
+
 parser = argparse.ArgumentParser(description="Construct privacy datasets")
 parser.add_argument("--datasets", type=str, nargs="+", default=["regular_chat", "system_prompt_clinical", "privacy_inference", "user_prompt"], help="List of datasets to construct")
 parser.add_argument("--datasets_length", type=int, nargs="+", default=[1000, 1000, 1000, 1000], help="List of dataset lengths")
@@ -25,7 +29,7 @@ dataset_dict = {}
 # preprocessing_function = functools.partial(data_preprocess, tokenizer=tokenizer)
 for dataset in dataset_list:
     if dataset == "regular_chat":
-        dataset_dict["regular_chat"] = datasets.load_dataset("HuggingFaceH4/ultrachat_200k", split="test_sft")
+        dataset_dict["regular_chat"] = datasets.load_dataset("HuggingFaceH4/ultrachat_200k", split="test_sft").map(add_label)
     else:
         raw_dataset = datasets.load_from_disk(f"./privacy_datasets/preprocessed/{dataset}")
         dataset_dict[dataset] = raw_dataset

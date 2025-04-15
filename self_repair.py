@@ -1,5 +1,5 @@
 import functools
-from utils import data_preprocess, FFSelfMonitor, prepare_model_info, save_fully_connected_hidden, save_attention_hidden, eval_rouge, eval_bleu
+from utils import data_preprocess, FFSelfMonitor, prepare_model_info, fetch_ff_representation, save_attention_hidden, eval_rouge, eval_bleu
 import torch
 from torch.nn import functional as F
 import datasets
@@ -61,17 +61,17 @@ tokenizer = AutoTokenizer.from_pretrained(f'{model_repos}/{model_name}')
 
 # register hook to save the internal states
 # ff_hook = {}
-# def save_fully_connected_hidden(layer_name, mod, inp, out):
+# def fetch_ff_representation(layer_name, mod, inp, out):
 #     ff_reps[layer_name].append(out.squeeze().detach().to(torch.float32).cpu().numpy())
 # ff_reps = defaultdict(list)
 ff_rep = {}
 named_modules = dict(model.named_modules())
 monitored_module_name = model_info[1]
 monitored_module = named_modules[monitored_module_name]
-ff_hook = monitored_module.register_forward_hook(functools.partial(save_fully_connected_hidden, hidden=ff_rep, layer_name=monitored_module_name))
+ff_hook = monitored_module.register_forward_hook(functools.partial(fetch_ff_representation, hidden=ff_rep, layer_name=monitored_module_name))
 # for name, module in model.named_modules():
 #     if re.match(f'{model_info[1]}$', name):
-#         ff_hook = module.register_forward_hook(functools.partial(save_fully_connected_hidden, save_dict=ff_reps, layer_name=name))
+#         ff_hook = module.register_forward_hook(functools.partial(fetch_ff_representation, save_dict=ff_reps, layer_name=name))
 #         module_name = name
         # monitored_module = module
     # if re.match(f'{model_repos[model_name][2]}$', name):

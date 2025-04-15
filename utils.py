@@ -53,15 +53,26 @@ class FFSelfMonitor(torch.nn.Module):
 def prepare_model_info(model_name, layer_number: Union[int, str]=-1):
     coll_str = "[0-9]+" if layer_number==-1 else str(layer_number)
     model_info = {
-        "falcon-40b" : ("tiiuae", f".*transformer.h.{coll_str}.mlp.dense_4h_to_h", f".*transformer.h.{coll_str}.self_attention.dense"),
-        "falcon-7b" : ("tiiuae", f".*transformer.h.{coll_str}.mlp.dense_4h_to_h", f".*transformer.h.{coll_str}.self_attention.dense"),
-        "falcon-7b-instruct" : ("tiiuae", f".*transformer.h.{coll_str}.mlp.dense_4h_to_h", f".*transformer.h.{coll_str}.self_attention.dense"),
-        "open_llama_13b" : ("openlm-research", f".*model.layers.{coll_str}.mlp.up_proj", f".*model.layers.{coll_str}.self_attn.o_proj"),
-        "open_llama_7b" : ("openlm-research", f".*model.layers.{coll_str}.mlp.up_proj", f".*model.layers.{coll_str}.self_attn.o_proj"),
-        "opt-6.7b" : ("facebook", f".*model.decoder.layers.{coll_str}.fc2", f".*model.decoder.layers.{coll_str}.self_attn.out_proj"),
-        "opt-30b" : ("facebook", f".*model.decoder.layers.{coll_str}.fc2", f".*model.decoder.layers.{coll_str}.self_attn.out_proj", ),
-        "Llama-2-13b-chat-hf": ("meta-llama", f"model.layers.{coll_str}.mlp.up_proj", f".*model.layers.{coll_str}.self_attn.o_proj"),
-        "Llama-3.1-8B-Instruct": ("meta-llama", f"model.layers.{coll_str}.mlp.up_proj", f".*model.layers.{coll_str}.self_attn.o_proj"),
+        "tiiuae/falcon-40b" : {
+            "ff": f".*transformer.h.{coll_str}.mlp.dense_4h_to_h", 
+            "att": f".*transformer.h.{coll_str}.self_attention.dense"
+            },
+        "tiiuae/falcon-7b" : {
+            "ff": f".*transformer.h.{coll_str}.mlp.dense_4h_to_h", 
+            "att": f".*transformer.h.{coll_str}.self_attention.dense"
+            },
+        "tiiuae/falcon-7b-instruct" : {
+            "ff": f".*transformer.h.{coll_str}.mlp.dense_4h_to_h", 
+            "att": f".*transformer.h.{coll_str}.self_attention.dense"
+            },
+        "meta-llama/Llama-2-13b-chat-hf": {
+            "ff": r"model.layers.(\d+).mlp.up_proj", 
+            "att": f".*model.layers.{coll_str}.self_attn.o_proj"
+            },
+        "meta-llama/Llama-3.1-8B-Instruct": {
+            "ff": f"model.layers.{coll_str}.mlp.up_proj", 
+            "att": f".*model.layers.{coll_str}.self_attn.o_proj"
+            },
     }
     return model_info[model_name]
 
@@ -71,7 +82,11 @@ def print_chat(messages):
         print(f"{m['content']}")
     print("\n\n")
 
-def save_fully_connected_hidden(mod, inp, out, hidden, layer_name):
+def save_ff_representation(mod, inp, out, ff_rep, layer_num):
+    # Out size: (batch_size, seq_len, hidden_size)
+    ff_rep[layer_num] = out.squeeze().detach().to(torch.float32).cpu().numpy()
+    
+def fetch_ff_representation(mod, inp, out, hidden, layer_name):
     # Out size: (batch_size, seq_len, hidden_size)
     hidden["current"] = out[0, -1, :].squeeze().detach()
     
@@ -103,6 +118,14 @@ def data_preprocess(example, tokenizer, min_res_len=5, max_res_len=50):
     example["ori_str"] = tokenizer.decode(a_ids)
     # if len(preprocessed_dataset["input_ids"]) >= max_exa:
     #     break
+    return example
+
+def add_input_ids(example, tokenizer):
+    example["input_ids"] = tokenizer.apply_chat_template(example["messages"], tokenize=True)
+    return example
+
+def add_res_start_idx(example, tokenizer):
+    example["res_start_idx"] = len(tokenizer.apply_chat_template(example["messages"][:-1], tokenize=True))
     return example
 
 def create_dataset( 

@@ -120,11 +120,11 @@ def compute_and_save_results():
                 results['start_pos'].append(start_pos)
                 results['label'].append(entry['label'])
                 results['ff_rep'].append(ff_rep)
-        out_dataset[dataset_name] = datasets.Dataset.from_dict(results)
-    out_dataset = datasets.DatasetDict(out_dataset)
-    out_dataset.save_to_disk(f"{args.output_dir}/{args.model_name}_{datetime.now().month}_{datetime.now().day}")
-    # with open(f"{args.output_dir}/{args.model_name}_{datetime.now().month}_{datetime.now().day}.pickle", "wb") as outfile:
-    #     outfile.write(pickle.dumps(results))
+        out_dataset[dataset_name] = results
+    save_path = Path(f"{args.output_dir}/{args.model_name}/{datetime.now().month}_{datetime.now().day}.pickle")
+    save_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(save_path, 'wb') as outfile:
+        outfile.write(pickle.dumps(out_dataset))
 
 
 if __name__ == '__main__':

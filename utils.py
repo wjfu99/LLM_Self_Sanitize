@@ -15,8 +15,10 @@ from typing import Union
 from rouge_score import rouge_scorer
 from nltk.translate.bleu_score import sentence_bleu
 import evaluate
+import os
+import logging
 random.seed(0)
-
+logger = logging.getLogger(__name__)
 
 def eval_rouge(generated, target):
     scorer = rouge_scorer.RougeScorer(['rouge1', 'rouge2', 'rougeL'], use_stemmer=True)
@@ -127,6 +129,27 @@ def add_input_ids(example, tokenizer):
 def add_res_start_idx(example, tokenizer):
     example["res_start_idx"] = len(tokenizer.apply_chat_template(example["messages"][:-1], tokenize=True))
     return example
+
+def check_files_exist(*file_paths):
+    """
+    Check if the input file(s) exist at the given file path(s).
+
+    Parameters:
+        *file_paths (str): One or more strings representing the file path(s) to check.
+
+    Returns:
+        bool: True if all the files exist, False otherwise.
+    """
+    for file_path in file_paths:
+        if not os.path.isfile(file_path):
+            return False
+    return True
+
+
+def create_folder(folder_path):
+    if not os.path.exists(folder_path):
+        os.makedirs(folder_path)
+        logger.info(f"Folder '{folder_path}' created.")
 
 def create_dataset( 
             tokenizer=None, 

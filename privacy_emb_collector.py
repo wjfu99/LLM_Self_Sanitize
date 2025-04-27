@@ -23,6 +23,7 @@ from utils import data_preprocess
 from huggingface_hub import login
 import argparse
 import utils
+from copy import deepcopy
 
 # Hf credentials
 login("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")
@@ -119,7 +120,7 @@ def compute_and_save_results():
                 results['qa_str'].append(qa_str)
                 results['start_pos'].append(start_pos)
                 results['label'].append(entry['label'])
-                results['ff_rep'].append(ff_rep)
+                results['ff_rep'].append(deepcopy(ff_rep))
         out_dataset[dataset_name] = results
     save_path = Path(f"{args.output_dir}/{args.model_name}/{datetime.now().month}_{datetime.now().day}.pickle")
     save_path.parent.mkdir(parents=True, exist_ok=True)

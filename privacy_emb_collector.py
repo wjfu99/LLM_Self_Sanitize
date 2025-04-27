@@ -39,26 +39,12 @@ parser.add_argument("--skip_res_tokens", type=int, default=0, help="The number o
 parser.add_argument("--max_monitor_tokens", type=int, default=50, help="The maximum number of tokens to monitor")
 args = parser.parse_args()
 
-# Data related params
-iteration = 0
-interval = 2500 # We run the inference on these many examples at a time to achieve parallelization
-start = iteration * interval
-end = start + interval
-dataset_name = "place_of_birth" # "trivia_qa" #"capitals"
-use_cache = True
-dataset_length = dict(zip(args.datasets, args.datasets_length))
 
 # Hardware
 gpu = "0"
 device = torch.device(f"cuda:{gpu}" if torch.cuda.is_available() else "cpu")
 
 model_info = utils.prepare_model_info(args.model_name, ".*")
-
-# For storing results
-fully_connected_hidden_layers = defaultdict(list)
-attention_hidden_layers = defaultdict(list)
-attention_forward_handles = {}
-fully_connected_forward_handles = {}
 
 def fetch_selected_tokens(ff_rep, token_pos):
     for layer_num in ff_rep.keys():
@@ -97,8 +83,8 @@ def compute_and_save_results():
         if match:
             dataset_name = match.group(1)
             split = match.group(2)
-            if split == "test":
-                continue
+            # if split == "test": # Not skip test set
+            #     continue
         else:
             raise ValueError(f"Invalid key format: {key}")
         
@@ -121,7 +107,7 @@ def compute_and_save_results():
                 results['start_pos'].append(start_pos)
                 results['label'].append(entry['label'])
                 results['ff_rep'].append(deepcopy(ff_rep))
-        out_dataset[dataset_name] = results
+        out_dataset[key] = results
     save_path = Path(f"{args.output_dir}/{args.model_name}/{datetime.now().month}_{datetime.now().day}.pickle")
     save_path.parent.mkdir(parents=True, exist_ok=True)
     with open(save_path, 'wb') as outfile:

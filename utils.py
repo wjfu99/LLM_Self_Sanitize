@@ -17,8 +17,24 @@ from nltk.translate.bleu_score import sentence_bleu
 import evaluate
 import os
 import logging
+from typing_extensions import Literal
+from rich.logging import RichHandler
 random.seed(0)
-logger = logging.getLogger(__name__)
+
+def get_logger(name: str, level: Literal["info", "warning", "debug"]) -> logging.Logger:
+    rich_handler = RichHandler(level=logging.INFO, rich_tracebacks=True, markup=True)
+
+    logger = logging.getLogger(name)
+    logger.setLevel(logging._nameToLevel[level.upper()])
+
+    if not logger.handlers:
+        logger.addHandler(rich_handler)
+
+    logger.propagate = False
+
+    return logger
+
+logger = get_logger(__name__, "info")
 
 def eval_rouge(generated, target):
     scorer = rouge_scorer.RougeScorer(['rouge1', 'rouge2', 'rougeL'], use_stemmer=True)
@@ -52,6 +68,40 @@ class FFSelfMonitor(torch.nn.Module):
         logits = self.linear_relu_stack(x)
         return logits
 
+class HierarchicalFFSelfMonitor(torch.nn.Module):
+    def __init__(self, input_shape, output_shapes=[2, 3], dropout = 0.5):
+        super().__init__()
+        self.dropout = dropout
+        
+        self.bottle_neck =torch.nn.Sequential(
+            torch.nn.Linear(input_shape, 1024),
+            torch.nn.ReLU(),
+            torch.nn.Dropout(self.dropout),
+            torch.nn.Linear(1024, 512),
+            torch.nn.ReLU(),
+            torch.nn.Dropout(self.dropout),
+            torch.nn.Linear(512, 256),
+            torch.nn.ReLU(),
+            torch.nn.Dropout(self.dropout),
+            )
+        self.linear_l1 = torch.nn.Linear(256, output_shapes[0])
+        self.linear_l2 = torch.nn.Linear(256, output_shapes[1])
+        self.output_l1 = torch.nn.Linear(output_shapes[0], output_shapes[0])
+        self.output_l2 = torch.nn.Linear(output_shapes[0]+output_shapes[1], output_shapes[1])
+        self.levels = len(output_shapes)
+        
+    def forward(self, x):
+        x = self.bottle_neck(x)
+        logits_l1 = self.output_l1(self.linear_l1(x))
+        logits_l2 = self.output_l2(torch.cat((logits_l1, self.linear_l2(x)), dim=1))
+        return logits_l1, logits_l2
+    
+    def lloss(self, logits, labels):
+        loss = 0
+        for l in range(self.levels):
+            loss += torch.nn.CrossEntropyLoss()(logits[l], labels[l])
+        return loss
+        
 def prepare_model_info(model_name, layer_number: Union[int, str]=-1):
     coll_str = "[0-9]+" if layer_number==-1 else str(layer_number)
     model_info = {

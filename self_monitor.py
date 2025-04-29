@@ -9,6 +9,7 @@ from sklearn.metrics import roc_auc_score
 from sklearn.preprocessing import LabelEncoder
 import random
 from utils import FFSelfMonitor, HierarchicalFFSelfMonitor
+import utils
 from tqdm import tqdm
 import argparse
 import logging
@@ -27,14 +28,14 @@ parser.add_argument("--dropout_gru", type=float, default=0.25, help="Dropout rat
 parser.add_argument("--learning_rate", type=float, default=1e-4, help="Learning rate for optimizer")
 parser.add_argument("--weight_decay", type=float, default=1e-2, help="Weight decay for optimizer")
 parser.add_argument("--layer_number", type=int, nargs="+", default=[32, 33, 34, 35, 36], help="The layer number to use")
-parser.add_argument("--hierarchical", action="store_true", help="Whether to use hierarchical self-monitoring")
+parser.add_argument("--hierarchical", action="store_true", default=True, help="Whether to use hierarchical self-monitoring")
 
 args = parser.parse_args()
 
 gpu = "0"
 device = torch.device(f"cuda:{gpu}" if torch.cuda.is_available() else "cpu")
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
+
+logger = utils.get_logger(__name__, level="info")
 
 # inference_results = list(Path("./results/").rglob("*.pickle"))
 # print (inference_results)
@@ -74,7 +75,10 @@ def gen_classifier_roc(train_features, train_labels, test_features, test_labels)
     with torch.no_grad():
         pred = F.softmax(classifier_model(X_test), dim=1)
         prediction_classes = torch.argmax(pred, dim=1).cpu()
-    torch.save(classifier_model.state_dict(), "./self_monitor_models/classifier_model_layer{}.pth".format(layer))
+    save_path = Path(f"./self_monitor_models/binary/classifier_model_layer{layer}.pth")
+    save_path.parent.mkdir(parents=True, exist_ok=True)
+    torch.save(classifier_model.state_dict(), save_path)
+    logger.info(f"Classifier model saved to {save_path}")
     prediction_classes = (pred[:,1]>0.5).type(torch.long).cpu()
     return roc_auc_score(y_test.cpu(), pred[:,1].cpu()), (prediction_classes.numpy()==y_test.cpu().numpy()).mean()
 
@@ -118,8 +122,10 @@ def hierachical_gen_classifier_roc(train_features, train_labels, train_l2_labels
         loss = classifier_model.lloss([pred_l1, pred_l2], [y1_train[sample], y2_train[sample]])
         loss.backward()
         optimizer.step()
-    classifier_model.eval()
-    torch.save(classifier_model.state_dict(), "./self_monitor_models/classifier_model_layer{}.pth".format(layer))
+    save_path = Path(f"./self_monitor_models/hierarchical/classifier_model_layer{layer}.pth")
+    save_path.parent.mkdir(parents=True, exist_ok=True)
+    torch.save(classifier_model.state_dict(), save_path)
+    logger.info(f"Classifier model saved to {save_path}")
     return evaluate_accuracy, evaluate_auc
         
 logger.info("Loading results from pickle file")
@@ -158,13 +164,16 @@ for layer in args.layer_number:
 logger.info("Generating classifier results for each layer")
 classifier_results = {}
 for layer in args.layer_number:
-    logger.info(f"Layer {layer}")
+    logger.info(f"Layer {layer}" + "="*20)
     train_features = np.concatenate([fl["ff_rep"] for fl in train_layer_emb[layer].values()])
     train_labels = np.concatenate([fl["label"] for fl in train_layer_emb[layer].values()])
     train_l2_labels = np.concatenate([fl["l2_label"] for fl in train_layer_emb[layer].values()])
     test_features = np.concatenate([fl["ff_rep"] for fl in test_layer_emb[layer].values()])
     test_labels = np.concatenate([fl["label"] for fl in test_layer_emb[layer].values()])
     test_l2_labels = np.concatenate([fl["l2_label"] for fl in test_layer_emb[layer].values()])
-    layer_roc, layer_acc = hierachical_gen_classifier_roc(train_features, train_labels, train_l2_labels, 
+    if args.hierarchical:
+        layer_acc, layer_auc = hierachical_gen_classifier_roc(train_features, train_labels, train_l2_labels, 
                                               test_features, test_labels, test_l2_labels)
-    logger.info(f"Layer {layer}: ROC AUC: {layer_roc}, Accuracy: {layer_acc}")
+    else:
+        layer_auc, layer_acc = gen_classifier_roc(train_features, train_labels, test_features, test_labels)
+    logger.info(f"Layer {layer}: ROC AUC: {layer_auc}, Accuracy: {layer_acc}")

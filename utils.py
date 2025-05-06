@@ -93,7 +93,7 @@ class HierarchicalFFSelfMonitor(torch.nn.Module):
     def forward(self, x):
         x = self.bottle_neck(x)
         logits_l1 = self.output_l1(self.linear_l1(x))
-        logits_l2 = self.output_l2(torch.cat((logits_l1, self.linear_l2(x)), dim=1))
+        logits_l2 = self.output_l2(torch.cat((logits_l1, self.linear_l2(x)), dim=-1))
         return logits_l1, logits_l2
     
     def lloss(self, logits, labels):
@@ -118,7 +118,7 @@ def prepare_model_info(model_name, layer_number: Union[int, str]=-1):
             "att": f".*transformer.h.{coll_str}.self_attention.dense"
             },
         "meta-llama/Llama-2-13b-chat-hf": {
-            "ff": r"model.layers.(\d+).mlp.up_proj", 
+            "ff": f"model.layers.{coll_str}.mlp.up_proj", 
             "att": f".*model.layers.{coll_str}.self_attn.o_proj"
             },
         "meta-llama/Llama-3.1-8B-Instruct": {
@@ -138,9 +138,9 @@ def save_ff_representation(mod, inp, out, ff_rep, layer_num):
     # Out size: (batch_size, seq_len, hidden_size)
     ff_rep[layer_num] = out.squeeze().detach().to(torch.float32).cpu().numpy()
     
-def fetch_ff_representation(mod, inp, out, hidden, layer_name):
+def fetch_ff_representation(mod, inp, out, ff_rep, layer_name):
     # Out size: (batch_size, seq_len, hidden_size)
-    hidden["current"] = out[0, -1, :].squeeze().detach()
+    ff_rep["current"] = out[0, -1, :].squeeze().detach()
     
 # def save_fully_connected_hidden(mod, inp, out, save_dict, layer_name):
 #     save_dict[layer_name].append(out.squeeze().detach().to(torch.float32).cpu().numpy())

@@ -1,5 +1,6 @@
 import functools
-from utils import data_preprocess, FFSelfMonitor, prepare_model_info, fetch_ff_representation, save_attention_hidden, eval_rouge, eval_bleu
+import utils
+from utils import data_preprocess, FFSelfMonitor, prepare_model_info, fetch_ff_representation, save_attention_hidden, eval_rouge, eval_bleu, HierarchicalFFSelfMonitor
 import torch
 from torch.nn import functional as F
 import datasets
@@ -13,12 +14,23 @@ from copy import deepcopy
 from nltk.translate.bleu_score import sentence_bleu
 from rouge_score import rouge_scorer
 import evaluate
+import argparse
+from pathlib import Path
+
+parser = argparse.ArgumentParser(description="Self-repair mechanism")
+parser.add_argument("--self_monitor_layer", type=int, default=35, help="The layer number to use")
+parser.add_argument("--model_name", type=str, default="meta-llama/Llama-2-13b-chat-hf", help="The model name to use")
+parser.add_argument("--aio_dataset", type=str, default="./privacy_datasets/preprocessed/aio", help="The dataset to use")
+parser.add_argument("--output_dir", type=str, default="./privacy_datasets/self_repair_results", help="The output directory for the dataset")
+parser.add_argument("--hierarchical", action="store_true", default=True, help="Whether to use hierarchical self-monitoring")
+parser.add_argument("--self_monitor_window", type=int, default=5, help="The window size for self-monitoring")
+parser.add_argument("--self_monitor_threshold", type=float, default=0.9, help="The threshold for self-monitoring")
+parser.add_argument("--max_repair_turns", type=int, default=1, help="The maximum number of repair turns")
+
+args = parser.parse_args()
 
 use_cache = True
-model_name = "Llama-2-13b-chat-hf" #"opt-30b"
-self_monitor_layer = 35
-model_info = prepare_model_info(model_name, self_monitor_layer)
-model_repos = model_info[0]
+model_info = prepare_model_info(args.model_name, args.self_monitor_layer)
 dataset_length = {
     # "system_prompt": 1000,
     "regular_chat": 1000,
@@ -33,31 +45,10 @@ I want to remind you that your current response has been interrupted, since it h
 regurgitant_tokens = 5
 max_generated_tokens = 5000
 
-# class SelfRepairPipeline(Pipeline):
-#     def _sanitize_parameters(self, **kwargs):
-#         preprocess_kwargs = {}
-#         if "maybe_arg" in kwargs:
-#             preprocess_kwargs["maybe_arg"] = kwargs["maybe_arg"]
-#         return preprocess_kwargs, {}, {}
-    
-#     def preprocess(self, inputs, maybe_arg=2):
-#         model_input = Tensor(inputs["input_ids"])
-#         return {"model_input": model_input}
-    
-#     def _forward(self, model_inputs):
-#         # model_inputs == {"model_input": model_input}
-#         outputs = self.model(**model_inputs)
-#         # Maybe {"logits": Tensor(...)}
-#         return outputs
-    
-#     def postprocess(self, model_outputs):
-#         best_class = model_outputs["logits"].softmax(-1)
-#         return best_class
-
 # load the model and tokenizer
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-model = AutoModelForCausalLM.from_pretrained(f'{model_repos}/{model_name}', device_map=device)
-tokenizer = AutoTokenizer.from_pretrained(f'{model_repos}/{model_name}')
+model = AutoModelForCausalLM.from_pretrained(args.model_name, device_map=device)
+tokenizer = AutoTokenizer.from_pretrained(args.model_name)
 
 # register hook to save the internal states
 # ff_hook = {}
@@ -66,22 +57,16 @@ tokenizer = AutoTokenizer.from_pretrained(f'{model_repos}/{model_name}')
 # ff_reps = defaultdict(list)
 ff_rep = {}
 named_modules = dict(model.named_modules())
-monitored_module_name = model_info[1]
+monitored_module_name = model_info["ff"]
 monitored_module = named_modules[monitored_module_name]
-ff_hook = monitored_module.register_forward_hook(functools.partial(fetch_ff_representation, hidden=ff_rep, layer_name=monitored_module_name))
-# for name, module in model.named_modules():
-#     if re.match(f'{model_info[1]}$', name):
-#         ff_hook = module.register_forward_hook(functools.partial(fetch_ff_representation, save_dict=ff_reps, layer_name=name))
-#         module_name = name
-        # monitored_module = module
-    # if re.match(f'{model_repos[model_name][2]}$', name):
-    #     attention_forward_handles[name] = module.register_forward_hook(functools.partial(save_attention_hidden, name))
+ff_hook = monitored_module.register_forward_hook(functools.partial(fetch_ff_representation, ff_rep=ff_rep, layer_name=monitored_module_name))
     
 # load the self-monitor model
 # TODO: Multiple heads self-monitor
 monitor_dimention = monitored_module.out_features
-sm_model = FFSelfMonitor(input_shape=monitor_dimention).to(device)
-sm_model.load_state_dict(torch.load("./self_monitor_models/classifier_model_layer3.pth", weights_only=True))
+if args.hierarchical:
+    sm_model = HierarchicalFFSelfMonitor(input_shape=monitor_dimention).to(device)
+    sm_model.load_state_dict(torch.load(f"./self_monitor_models/hierarchical/classifier_model_layer{args.self_monitor_layer}.pth", weights_only=True))
 sm_model.eval()
 
 # Load the datasets
@@ -105,11 +90,21 @@ for key, dataset in dataset_dict.items():
         dataset = dataset.filter(lambda x: x['res_start_idx']<=2500)
         dataset_dict[key] = dataset.select(range(dataset_length[key]))
         
+# Load the datasets
+aio_dataset = datasets.load_from_disk(args.aio_dataset)
+aio_dataset = aio_dataset.map(functools.partial(utils.add_input_ids, tokenizer=tokenizer))
+aio_dataset = aio_dataset.map(functools.partial(utils.add_res_start_idx, tokenizer=tokenizer))
 
 # TODO: Accelerate with larger batch size
 # TODO: Add regurgitation mechanism for self-repair
-for key, dataset in dataset_dict.items():
-    if key != "system_prompt_clinical":
+for key, dataset in aio_dataset.items():
+    match = re.match(r"([a-zA-Z0-9_]+)_(train|test)", key)
+    if match:
+        dataset_name = match.group(1)
+        split = match.group(2)
+    else:
+        raise ValueError(f"Invalid key format: {key}")
+    if split == "train" or dataset_name != "system_prompt_clinical":
         continue
     # else:
     #     dataset = dataset.filter(lambda x: x['label']==1).select(range(50))
@@ -119,6 +114,7 @@ for key, dataset in dataset_dict.items():
     self_monitor_tokens_list = []
     self_monitor_scores_list = []
     interrupted_message_list = []
+    self_repair_count_list = []
     for entry in tqdm(dataset):
         with torch.inference_mode():
             messages = entry["messages"][:-1]
@@ -139,12 +135,19 @@ for key, dataset in dataset_dict.items():
                 
                 # TODO: Conduct the self-monitor every N tokens
                 # inject the self-monitor process for each tokens
-                prob = F.softmax(sm_model(ff_rep["current"]), dim=0).detach().cpu().numpy()
-                prob_cache.append(prob)
-                prob_queue = np.array(prob_cache[-5:])
-                # TODO: Maybe we can use prob_queue.mean(axis=0)[1:].sum() to deploy a more flexible self-monitor criteria
-                self_monitor_criteria = prob_queue.mean(axis=0)[1:].max() > 0.9 # or prob_queue[-1, 1:].max() > 0.9
-                if self_monitor_criteria and self_repair_count == 0:
+                if args.hierarchical:
+                    logits_l1, logits_l2 = sm_model(ff_rep["current"])
+                    prob_l1 = F.softmax(logits_l1, dim=-1).detach().cpu().numpy()
+                    prob_cache.append(prob_l1)
+                    prob_queue = np.array(prob_cache[-args.self_monitor_window:])
+                    self_monitor_criteria = prob_queue.mean(axis=0)[1] > args.self_monitor_threshold
+                else:
+                    prob = F.softmax(sm_model(ff_rep["current"]), dim=-1).detach().cpu().numpy()
+                    prob_cache.append(prob)
+                    prob_queue = np.array(prob_cache[-args.self_monitor_window:])
+                    # TODO: Maybe we can use prob_queue.mean(axis=0)[1:].sum() to deploy a more flexible self-monitor criteria
+                    self_monitor_criteria = prob_queue.mean(axis=0)[1:].max() > args.self_monitor_threshold # or prob_queue[-1, 1:].max() > 0.9
+                if self_monitor_criteria and self_repair_count < args.max_repair_turns:
                     self_monitor_tokens = len(outputs["sequences"][0, input_length:])
                     self_monitor_scores = prob_queue.mean(axis=0)[1:].max()
                     interrupted_message = tokenizer.decode(outputs["sequences"][0, input_length:], skip_special_tokens=True)
@@ -179,6 +182,7 @@ for key, dataset in dataset_dict.items():
             self_monitor_tokens_list.append(self_monitor_tokens)
             self_monitor_scores_list.append(self_monitor_scores)
             interrupted_message_list.append(interrupted_message)
+            self_repair_count_list.append(self_repair_count)
     # rouge_scores, _ = eval_rouge(response_list, dataset["entities"])
     # bleu_scores = eval_bleu(response_list, dataset["entities"])
     dataset = dataset.add_column("response", response_list)
@@ -186,9 +190,12 @@ for key, dataset in dataset_dict.items():
     dataset = dataset.add_column("interrupted_message", interrupted_message_list)
     dataset = dataset.add_column("self_monitor_tokens", self_monitor_tokens_list)
     dataset = dataset.add_column("self_monitor_scores", self_monitor_scores_list)
+    dataset = dataset.add_column("self_repair_count", self_repair_count_list)
     dataset_dict[key] = dataset
 
 dataset_dict = datasets.DatasetDict(dataset_dict)
-dataset_dict.save_to_disk(f"./privacy_datasets/self_repair_results/{model_repos}/{model_name}")
+save_path = Path(f"{args.output_dir}/{args.model_name}")
+save_path.mkdir(parents=True, exist_ok=True)
+dataset_dict.save_to_disk(save_path)
                 # completion = tokenizer.decode(outputs["sequences"][0, input_length: ], skip_special_tokens=True)
                 # unfinished_sequences = stopping_criteria(input_ids, scores)

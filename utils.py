@@ -41,15 +41,22 @@ def eval_rouge(generated, target):
     raw_scores = [scorer.score(t, r) for r, t in zip(generated, target)]
     avg_scores = {}
     for key in raw_scores[0].keys():
-        avg_scores[key] = np.mean([score[key].fmeasure for score in raw_scores])
+        avg_scores[key] = np.mean([score[key].recall for score in raw_scores])
     return avg_scores, raw_scores
     # return scores
+
+# HF instance use rouge f1 measure not the original recall
+def eval_rouge_hf(generated, target, tokenizer=None):
+    scorer = evaluate.load("rouge", tokenizer=tokenizer)
+    scorer.add_batch(predictions=generated, references=target)
+    scores = scorer.compute(rouge_types=["rouge1", "rouge2", "rougeL"], use_stemmer=True)
+    return scores
 
 def eval_bleu(generated, target, tokenizer=None):
     scorer = evaluate.load("bleu", tokenizer=tokenizer)
     scorer.add_batch(predictions=generated, references=target)
     scores = scorer.compute()
-    return scores["bleu"]
+    return scores
 
 # The class of self-monitor model
 class FFSelfMonitor(torch.nn.Module):

@@ -68,32 +68,12 @@ if args.hierarchical:
     sm_model = HierarchicalFFSelfMonitor(input_shape=monitor_dimention).to(device)
     sm_model.load_state_dict(torch.load(f"./self_monitor_models/hierarchical/classifier_model_layer{args.self_monitor_layer}.pth", weights_only=True))
 sm_model.eval()
-
-# Load the datasets
-dataset_list = dataset_length.keys()
-dataset_dict = {}
-preprocessing_function = functools.partial(data_preprocess, tokenizer=tokenizer)
-for dataset in dataset_list:
-    if dataset == "regular_chat":
-        dataset_dict["regular_chat"] = datasets.load_dataset("HuggingFaceH4/ultrachat_200k", split="test_sft").map(preprocessing_function, load_from_cache_file=use_cache, num_proc=8)
-    else:
-        raw_dataset = datasets.load_from_disk(f"./privacy_datasets/preprocessed/{dataset}")
-        preprocessed_dataset = raw_dataset.map(preprocessing_function, load_from_cache_file=use_cache, num_proc=8)
-        dataset_dict[dataset] = preprocessed_dataset
-for key, dataset in dataset_dict.items():
-    if key != "regular_chat":
-        shard_length = dataset_length[key] // 2
-        pos_dataset = dataset.filter(lambda x: x['label']==1).select(range(shard_length))
-        neg_dataset = dataset.filter(lambda x: x['label']==0).select(range(shard_length))
-        dataset_dict[key] = datasets.concatenate_datasets([pos_dataset, neg_dataset])
-    else:
-        dataset = dataset.filter(lambda x: x['res_start_idx']<=2500)
-        dataset_dict[key] = dataset.select(range(dataset_length[key]))
         
 # Load the datasets
 aio_dataset = datasets.load_from_disk(args.aio_dataset)
 aio_dataset = aio_dataset.map(functools.partial(utils.add_input_ids, tokenizer=tokenizer))
 aio_dataset = aio_dataset.map(functools.partial(utils.add_res_start_idx, tokenizer=tokenizer))
+dataset_dict = {}
 
 # TODO: Accelerate with larger batch size
 # TODO: Add regurgitation mechanism for self-repair

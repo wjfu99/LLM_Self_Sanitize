@@ -210,9 +210,9 @@ attack_messages = prepare_messages(system_prompt_list, attacker_prompt_list, ext
 regular_dataset = datasets.Dataset.from_dict({
     "messages": regular_messages,
     "label": [0] * len(regular_messages),
-    "text": text_list,
-    "entities": formatted_entities_list,
-    "example": example_list,
+    "text": text_list, # the raw text in the system prompt
+    "entities": formatted_entities_list, # the entities in the system prompt
+    "example": example_list, # the example in the system prompt
 })
 attack_dataset = datasets.Dataset.from_dict({
     "messages": attack_messages,

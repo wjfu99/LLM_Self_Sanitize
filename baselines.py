@@ -97,7 +97,7 @@ pipe = transformers.pipeline(
     model=args.model_name,
     device=0,
     num_return_sequences=1,
-    max_length=512,
+    max_new_tokens=512,
 )
 pipe.tokenizer.pad_token_id = pipe.model.config.eos_token_id
 

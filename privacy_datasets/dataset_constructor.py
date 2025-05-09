@@ -36,6 +36,7 @@ for dataset in dataset_list:
 
 aio_dataset = {}
 for key, dataset in dataset_dict.items():
+    dataset = dataset.add_column("type", [key] * len(dataset))
     if key != "regular_chat":
         shard_length = dataset_list[key] // 2
         pos_dataset = dataset.filter(lambda x: x['label']==1).select(range(shard_length))

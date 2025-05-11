@@ -105,10 +105,15 @@ pipe.tokenizer.pad_token_id = pipe.model.config.eos_token_id
 
 for dataset_name, dataset in baseline_datasets.items():
     accomplished_messages_list = []
+    response_list = []
     batched_dataset = dataset["system_prompt_clinical_test"].batch(batch_size=args.batch_size)
     for batch in tqdm(batched_dataset):
         out = pipe(batch["messages"])
-        accomplished_messages_list.extend(out)
+        messages = [item[0]["generated_text"] for item in out]
+        generated_text = [item[0]["generated_text"][-1]["content"] for item in out]
+        accomplished_messages_list.extend(messages)
+        response_list.extend(generated_text)
+    dataset["system_prompt_clinical_test"] = dataset["system_prompt_clinical_test"].add_column("response", response_list)
     dataset["system_prompt_clinical_test"] = dataset["system_prompt_clinical_test"].add_column("accomplished_messages", accomplished_messages_list)
     dataset.save_to_disk(f"{args.output_dir}/{dataset_name}/{args.model_name}")
 # for out in tqdm(pipe(KeyDataset(ins_dataset["system_prompt_clinical_test"], "messages"), total=len(ins_dataset["system_prompt_clinical_test"]))):

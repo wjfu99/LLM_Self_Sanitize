@@ -12,8 +12,8 @@ from torch.utils.data import Dataset
 parser = argparse.ArgumentParser(description="Run baselines")
 parser.add_argument("--aio_dataset", type=str, default="./privacy_datasets/preprocessed/aio", help="The dataset to use")
 parser.add_argument("--model_name", type=str, default="meta-llama/Llama-2-13b-chat-hf", help="The model name to use")
-parser.add_argument("--output_dir", type=str, default="./privacy_datasets/baselines_results", help="The output directory for the dataset")
-parser.add_argument("--batch_size", type=int, default=1, help="The batch size to use")
+parser.add_argument("--output_dir", type=str, default="./results/response", help="The output directory for the dataset")
+parser.add_argument("--batch_size", type=int, default=8, help="The batch size to use")
 
 args = parser.parse_args()
 
@@ -63,6 +63,8 @@ def xml_tag_defense(example):
     
     return example
 
+# def query_rewritting_defense(example):
+
 logger.info("Loading the dataset...")
 aio_dataset = datasets.load_from_disk(args.aio_dataset)
 keys = list(aio_dataset.keys())
@@ -107,8 +109,8 @@ for dataset_name, dataset in baseline_datasets.items():
     for batch in tqdm(batched_dataset):
         out = pipe(batch["messages"])
         accomplished_messages_list.extend(out)
-    dataset["system_prompt_clinical_test"].add_column("accomplished_messages", accomplished_messages_list)
-    dataset.save_to_disk(f"{args.output_dir}/{args.model_name}/{dataset_name}")
+    dataset["system_prompt_clinical_test"] = dataset["system_prompt_clinical_test"].add_column("accomplished_messages", accomplished_messages_list)
+    dataset.save_to_disk(f"{args.output_dir}/{dataset_name}/{args.model_name}")
 # for out in tqdm(pipe(KeyDataset(ins_dataset["system_prompt_clinical_test"], "messages"), total=len(ins_dataset["system_prompt_clinical_test"]))):
 #     print(out)
 

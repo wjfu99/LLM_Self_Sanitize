@@ -119,7 +119,7 @@ for dataset_name, dataset in baseline_datasets.items():
     response_list = []
     batched_dataset = dataset["system_prompt_clinical_test"].batch(batch_size=args.batch_size)
     for batch in tqdm(batched_dataset):
-        out = pipe(batch["messages"])
+        out = pipe(batch["query"])
         messages = [item[0]["generated_text"] for item in out]
         generated_text = [item[0]["generated_text"][-1]["content"] for item in out]
         accomplished_messages_list.extend(messages)

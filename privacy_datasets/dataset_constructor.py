@@ -13,6 +13,11 @@ def add_label(example):
     example["label"] = 0
     return example
 
+def construct_query(example):
+    example["query"] = example["messages"][:-1]
+    assert example["query"][-1]["role"] == "user"
+    return example
+
 parser = argparse.ArgumentParser(description="Construct privacy datasets")
 parser.add_argument("--datasets", type=str, nargs="+", default=["regular_chat", "system_prompt_clinical", "privacy_inference", "user_prompt"], help="List of datasets to construct")
 parser.add_argument("--datasets_length", type=int, nargs="+", default=[1000, 1000, 1000, 1000], help="List of dataset lengths")
@@ -52,4 +57,5 @@ for key, dataset in dataset_dict.items():
         
         
 aio_dataset = datasets.DatasetDict(aio_dataset)
+aio_dataset = aio_dataset.map(construct_query)
 aio_dataset.save_to_disk("./privacy_datasets/preprocessed/aio")

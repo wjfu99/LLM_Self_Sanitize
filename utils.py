@@ -19,6 +19,9 @@ import os
 import logging
 from typing_extensions import Literal
 from rich.logging import RichHandler
+import collections
+import math
+from transformers import PreTrainedTokenizer, PreTrainedTokenizerFast
 random.seed(0)
 
 def get_logger(name: str, level: Literal["info", "warning", "debug"]) -> logging.Logger:
@@ -36,8 +39,8 @@ def get_logger(name: str, level: Literal["info", "warning", "debug"]) -> logging
 
 logger = get_logger(__name__, "info")
 
-def eval_rouge(generated, target):
-    scorer = rouge_scorer.RougeScorer(['rouge1', 'rouge2', 'rougeL'], use_stemmer=True)
+def eval_rouge(generated, target, tokenizer=None):
+    scorer = rouge_scorer.RougeScorer(['rouge1', 'rouge2', 'rougeL'], use_stemmer=True, tokenizer=tokenizer)
     raw_scores = [scorer.score(t, r) for r, t in zip(generated, target)]
     avg_scores = {}
     for key in raw_scores[0].keys():
@@ -52,10 +55,32 @@ def eval_rouge_hf(generated, target, tokenizer=None):
     scores = scorer.compute(rouge_types=["rouge1", "rouge2", "rougeL"], use_stemmer=True)
     return scores
 
-def eval_bleu(generated, target, tokenizer=None):
-    scorer = evaluate.load("bleu", tokenizer=tokenizer)
+def eval_bleu(generated, target, tokenizer=None, max_order=4, smooth=False):
+    if isinstance(tokenizer, (PreTrainedTokenizer, PreTrainedTokenizerFast)):
+        tokenizer = tokenizer.encode
+    # if only one reference is provided make sure we still use list of lists
+    if isinstance(target[0], str):
+        target = [[ref] for ref in target]
+    
+    target = [[tokenizer(r) for r in ref] for ref in target]
+    generated = [tokenizer(p) for p in generated]
+    score = compute_bleu(
+        reference_corpus=target, translation_corpus=generated, max_order=max_order, smooth=smooth
+    )
+    (bleu, precisions, bp, ratio, translation_length, reference_length) = score
+    return {
+        "bleu": bleu,
+        "precisions": precisions,
+        "brevity_penalty": bp,
+        "length_ratio": ratio,
+        "translation_length": translation_length,
+        "reference_length": reference_length,
+    }
+
+def eval_bleu_hf(generated, target, tokenizer=None):
+    scorer = evaluate.load("bleu")
     scorer.add_batch(predictions=generated, references=target)
-    scores = scorer.compute()
+    scores = scorer.compute(tokenizer=tokenizer)
     return scores
 
 # The class of self-monitor model
@@ -342,6 +367,91 @@ def create_dataset(
         "harm_res": harm_res_dataset
     }
 
+def _get_ngrams(segment, max_order):
+  """Extracts all n-grams upto a given maximum order from an input segment.
+
+  Args:
+    segment: text segment from which n-grams will be extracted.
+    max_order: maximum length in tokens of the n-grams returned by this
+        methods.
+
+  Returns:
+    The Counter containing all n-grams upto max_order in segment
+    with a count of how many times each n-gram occurred.
+  """
+  ngram_counts = collections.Counter()
+  for order in range(1, max_order + 1):
+    for i in range(0, len(segment) - order + 1):
+      ngram = tuple(segment[i:i+order])
+      ngram_counts[ngram] += 1
+  return ngram_counts
+
+
+def compute_bleu(reference_corpus, translation_corpus, max_order=4,
+                 smooth=False):
+  """Computes BLEU score of translated segments against one or more references.
+
+  Args:
+    reference_corpus: list of lists of references for each translation. Each
+        reference should be tokenized into a list of tokens.
+    translation_corpus: list of translations to score. Each translation
+        should be tokenized into a list of tokens.
+    max_order: Maximum n-gram order to use when computing BLEU score.
+    smooth: Whether or not to apply Lin et al. 2004 smoothing.
+
+  Returns:
+    3-Tuple with the BLEU score, n-gram precisions, geometric mean of n-gram
+    precisions and brevity penalty.
+  """
+  matches_by_order = [0] * max_order
+  possible_matches_by_order = [0] * max_order
+  reference_length = 0
+  translation_length = 0
+  for (references, translation) in zip(reference_corpus,
+                                       translation_corpus):
+    reference_length += min(len(r) for r in references)
+    translation_length += len(translation)
+
+    merged_ref_ngram_counts = collections.Counter()
+    for reference in references:
+      merged_ref_ngram_counts |= _get_ngrams(reference, max_order)
+    translation_ngram_counts = _get_ngrams(translation, max_order)
+    overlap = translation_ngram_counts & merged_ref_ngram_counts
+    for ngram in overlap:
+      matches_by_order[len(ngram)-1] += overlap[ngram]
+    for order in range(1, max_order+1):
+      possible_matches = len(translation) - order + 1
+      if possible_matches > 0:
+        possible_matches_by_order[order-1] += possible_matches
+
+  precisions = [0] * max_order
+  for i in range(0, max_order):
+    if smooth:
+      precisions[i] = ((matches_by_order[i] + 1.) /
+                       (possible_matches_by_order[i] + 1.))
+    else:
+      if possible_matches_by_order[i] > 0:
+        precisions[i] = (float(matches_by_order[i]) /
+                         possible_matches_by_order[i])
+      else:
+        precisions[i] = 0.0
+
+  if min(precisions) > 0:
+    p_log_sum = sum((1. / max_order) * math.log(p) for p in precisions)
+    geo_mean = math.exp(p_log_sum)
+  else:
+    geo_mean = 0
+
+  ratio = float(translation_length) / reference_length
+
+  if ratio > 1.0:
+    bp = 1.
+  else:
+    bp = math.exp(1 - 1. / ratio)
+
+  bleu = geo_mean * bp
+
+  return (bleu, precisions, bp, ratio, translation_length, reference_length)
 
 # login("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")
 # Model

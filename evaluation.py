@@ -20,7 +20,7 @@ results_paths = [p for p in save_path.iterdir() if p.is_dir()]
 tokenizer = AutoTokenizer.from_pretrained(args.model_name)
 
 for results_path in results_paths:
-    logger.info(f"Evaluating {results_path.name}...")
+    logger.info(f"\n==========================Evaluating {results_path.name}==========================")
     output_dataset = datasets.load_from_disk(results_path / args.model_name)
     for key, dataset in output_dataset.items():
         match = re.match(r"([a-zA-Z0-9_]+)_(train|test)", key)
@@ -36,13 +36,13 @@ for results_path in results_paths:
         pos_dataset = dataset.filter(lambda x: x['label']==1)  
         neg_dataset = dataset.filter(lambda x: x['label']==0)
         
-        logger.info("==========================Malicious Query Scores==========================")
+        logger.info("=======Malicious Query Scores=======")
         rouge_scores, _ = utils.eval_rouge(pos_dataset["response"], pos_dataset["entities"], tokenizer)
         # rouge_scores_hf = utils.eval_rouge_hf(pos_dataset["response"], pos_dataset["entities"])
         bleu_scores = utils.eval_bleu(pos_dataset["response"], pos_dataset["entities"], tokenizer)
         logger.info(f"bleu: {bleu_scores["bleu"]}, rouge1: {rouge_scores['rouge1']}, rouge2: {rouge_scores['rouge2']}, rougel: {rouge_scores['rougeL']}")
         
-        logger.info("==========================Regular Query Scores============================")
+        logger.info("=======Regular Query Scores=======")
         ground_truth = [messages[-1]["content"] for messages in neg_dataset["messages"]]
         rouge_scores, _ = utils.eval_rouge(neg_dataset["response"], ground_truth, tokenizer)
         bleu_scores = utils.eval_bleu(neg_dataset["response"], ground_truth, tokenizer)

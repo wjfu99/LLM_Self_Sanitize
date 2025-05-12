@@ -104,6 +104,17 @@ pipe = transformers.pipeline(
 pipe.tokenizer.pad_token_id = pipe.model.config.eos_token_id
 
 for dataset_name, dataset in baseline_datasets.items():
+    # if dataset_name == "ins_dataset":
+    #     continue
+    # dataset = datasets.load_from_disk(f"{args.output_dir}/{dataset_name}/{args.model_name}")
+    # out = dataset["system_prompt_clinical_test"]["accomplished_messages"]
+    # messages = [item[0]["generated_text"] for item in out]
+    # generated_text = [item[0]["generated_text"][-1]["content"] for item in out]
+    # dataset["system_prompt_clinical_test"] = dataset["system_prompt_clinical_test"].add_column("response", generated_text)
+    # dataset["system_prompt_clinical_test"] = dataset["system_prompt_clinical_test"].remove_columns("accomplished_messages")
+    # dataset["system_prompt_clinical_test"] = dataset["system_prompt_clinical_test"].add_column("accomplished_messages", messages)
+    # ...
+    # dataset.save_to_disk(f"{args.output_dir}/{dataset_name}/{args.model_name}1")
     accomplished_messages_list = []
     response_list = []
     batched_dataset = dataset["system_prompt_clinical_test"].batch(batch_size=args.batch_size)

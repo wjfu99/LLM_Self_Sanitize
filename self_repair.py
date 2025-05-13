@@ -112,14 +112,20 @@ for key, dataset in aio_dataset.items():
                     logits_l1, logits_l2 = sm_model(ff_rep["current"])
                     prob_l1 = F.softmax(logits_l1, dim=-1).detach().cpu().numpy()
                     prob_cache.append(prob_l1)
-                    prob_queue = np.array(prob_cache[-args.self_monitor_window:])
-                    self_monitor_criteria = prob_queue.mean(axis=0)[1] > args.self_monitor_threshold
+                    if len(prob_cache) >= args.self_monitor_window:
+                        prob_queue = np.array(prob_cache[-args.self_monitor_window:])
+                        self_monitor_criteria = prob_queue.mean(axis=0)[1] > args.self_monitor_threshold
+                    else:
+                        self_monitor_criteria = False
                 else:
                     prob = F.softmax(sm_model(ff_rep["current"]), dim=-1).detach().cpu().numpy()
                     prob_cache.append(prob)
-                    prob_queue = np.array(prob_cache[-args.self_monitor_window:])
-                    # TODO: Maybe we can use prob_queue.mean(axis=0)[1:].sum() to deploy a more flexible self-monitor criteria
-                    self_monitor_criteria = prob_queue.mean(axis=0)[1:].max() > args.self_monitor_threshold # or prob_queue[-1, 1:].max() > 0.9
+                    if len(prob_cache) >= args.self_monitor_window:
+                        prob_queue = np.array(prob_cache[-args.self_monitor_window:])
+                        # TODO: Maybe we can use prob_queue.mean(axis=0)[1:].sum() to deploy a more flexible self-monitor criteria
+                        self_monitor_criteria = prob_queue.mean(axis=0)[1:].max() > args.self_monitor_threshold # or prob_queue[-1, 1:].max() > 0.9
+                    else:
+                        self_monitor_criteria = False
                 if self_monitor_criteria and self_repair_count < args.max_repair_turns:
                     self_monitor_tokens = len(outputs["sequences"][0, input_length:])
                     self_monitor_scores = prob_queue.mean(axis=0)[1:].max()

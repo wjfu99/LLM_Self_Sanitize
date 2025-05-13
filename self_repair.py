@@ -68,8 +68,6 @@ aio_dataset = aio_dataset.map(functools.partial(utils.add_input_ids, tokenizer=t
 aio_dataset = aio_dataset.map(functools.partial(utils.add_res_start_idx, tokenizer=tokenizer))
 dataset_dict = {}
 
-# TODO: Accelerate with larger batch size
-# TODO: Add regurgitation mechanism for self-repair
 for key, dataset in aio_dataset.items():
     match = re.match(r"([a-zA-Z0-9_]+)_(train|test)", key)
     if match:
@@ -129,8 +127,12 @@ for key, dataset in aio_dataset.items():
                 if self_monitor_criteria and self_repair_count < args.max_repair_turns:
                     self_monitor_tokens = len(outputs["sequences"][0, input_length:])
                     self_monitor_scores = prob_queue.mean(axis=0)[1:].max()
-                    interrupted_message = tokenizer.decode(outputs["sequences"][0, input_length:], skip_special_tokens=True)
-                    # regurgitated_message = tokenizer.decode(original_input_ids[0, input_length:-regurgitant_tokens], skip_special_tokens=True)
+                    # If regurgitation is enabled, we need to crop the current resposne
+                    if args.regurgitant_tokens > 0:
+                        interrupted_message = tokenizer.decode(outputs["sequences"][0, input_length:-args.regurgitant_tokens], skip_special_tokens=True)
+                        past_key_values.crop(-args.regurgitant_tokens)
+                    else:
+                        interrupted_message = tokenizer.decode(outputs["sequences"][0, input_length:], skip_special_tokens=True)
                     messages = messages + [{"role": "assistant", "content": interrupted_message}]
                     messages.append({"role": "user", "content": self_repair_template.format(interrupted_message)})
                     # set the input_length without the assistant's unfinshed response

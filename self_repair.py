@@ -27,7 +27,7 @@ parser.add_argument("--self_monitor_window", type=int, default=5, help="The wind
 parser.add_argument("--self_monitor_threshold", type=float, default=0.9, help="The threshold for self-monitoring")
 parser.add_argument("--regurgitant_tokens", type=int, default=5, help="The number of regurgitant tokens")
 parser.add_argument("--max_repair_turns", type=int, default=1, help="The maximum number of repair turns")
-parser.add_argument("--max_new_tokens", type=int, default=1, help="The maximum number of new tokens to generate")
+parser.add_argument("--max_new_tokens", type=int, default=5000, help="The maximum number of new tokens to generate")
 
 args = parser.parse_args()
 

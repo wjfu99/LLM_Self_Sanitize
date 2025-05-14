@@ -13,7 +13,7 @@ parser = argparse.ArgumentParser(description="Run baselines")
 parser.add_argument("--aio_dataset", type=str, default="./privacy_datasets/preprocessed/aio", help="The dataset to use")
 parser.add_argument("--model_name", type=str, default="meta-llama/Llama-2-13b-chat-hf", help="The model name to use")
 parser.add_argument("--output_dir", type=str, default="./results/response", help="The output directory for the dataset")
-parser.add_argument("--batch_size", type=int, default=300, help="The batch size to use")
+parser.add_argument("--batch_size", type=int, default=4, help="The batch size to use")
 
 args = parser.parse_args()
 
@@ -63,6 +63,18 @@ def xml_tag_defense(example):
     
     return example
 
+def construct_rewriting_prompt(example):
+    example["rewriting_prompt"] = [
+        {
+            "role": "system",
+            "content": '''You will be provided with an input query to answer questions. Your job is to process the query in the following manner: - paraphrase it in the form of a question if not already - keep it concise but no less than 15 words. expand logically if less than 15 words - fix any spelling/grammatical errors\nReturn only the processed query as your response'''
+        },
+        {
+            "role": "user",
+            "content": f"INPUT QUEEY: {example["query"][-1]["content"]}"
+        },
+    ]
+    return example
 # def query_rewritting_defense(example):
 
 logger.info("Loading the dataset...")
@@ -95,6 +107,7 @@ baseline_datasets["xml_dataset"] = xml_dataset
 
 # TODO: All defense (Combine all the above defenses)
 
+logger.info("Loading the model...")
 pipe = transformers.pipeline(
     # "text-generation",
     model=args.model_name,
@@ -103,6 +116,17 @@ pipe = transformers.pipeline(
     max_new_tokens=512,
 )
 pipe.tokenizer.pad_token_id = pipe.model.config.eos_token_id
+
+logger.info("Generating rewritten queries...")
+query_rewriter = '''You will be provided with an input query to answer questions. Your job is to process the query in the following manner: - paraphrase it in the form of a question if not already - keep it concise but no less than 15 words. expand logically if less than 15 words - fix any spelling/grammatical errors\nReturn only the processed query as your response\n========== USER INPUT ==========\n{}\n========== / USER INPUT =========\nProcessed Query:'''
+batched_dataset = aio_dataset["system_prompt_clinical_test"].map(construct_rewriting_prompt).batch(batch_size=args.batch_size)
+rewritten_query_list = []
+for batch in tqdm(batched_dataset):
+    out = pipe(batch["rewriting_prompt"])
+    rewritten_query = [item[0]["generated_text"][-1]["content"] for item in out]
+    rewritten_query_list.extend(rewritten_query)
+
+query_rewriter_dataset = aio_dataset["system_prompt_clinical_test"].add_column("rewritten_query", rewritten_query_list)
 
 for dataset_name, dataset in baseline_datasets.items():
     # if dataset_name == "ins_dataset":

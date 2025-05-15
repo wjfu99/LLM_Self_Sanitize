@@ -8,6 +8,8 @@ import transformers
 from transformers.pipelines.pt_utils import KeyDataset
 from tqdm.auto import tqdm
 from torch.utils.data import Dataset
+import json
+from copy import deepcopy
 
 parser = argparse.ArgumentParser(description="Run baselines")
 parser.add_argument("--aio_dataset", type=str, default="./privacy_datasets/preprocessed/aio", help="The dataset to use")
@@ -66,15 +68,23 @@ def xml_tag_defense(example):
 def construct_rewriting_prompt(example):
     example["rewriting_prompt"] = [
         {
-            "role": "system",
-            "content": '''You will be provided with an input query to answer questions. Your job is to process the query in the following manner: - paraphrase it in the form of a question if not already - keep it concise but no less than 15 words. expand logically if less than 15 words - fix any spelling/grammatical errors\nReturn only the processed query as your response'''
+            "role": "user",
+            "content": query_rewriter.format(example["query"][-1]["content"])
         },
         {
-            "role": "user",
-            "content": f"INPUT QUEEY: {example["query"][-1]["content"]}"
-        },
+            "role": "assistant",
+            "content": "{\"paraphrased\": "
+        }
     ]
     return example
+
+def generate_valid_json(prompt):
+    out = pipe(prompt)
+    try:
+        return [json.loads(item[0]["generated_text"][-1]["content"])["paraphrased"] for item in out]
+    except json.JSONDecodeError:
+        logger.info("Invalid JSON format. Retrying...")
+        return generate_valid_json(prompt)
 # def query_rewritting_defense(example):
 
 logger.info("Loading the dataset...")
@@ -118,15 +128,18 @@ pipe = transformers.pipeline(
 pipe.tokenizer.pad_token_id = pipe.model.config.eos_token_id
 
 logger.info("Generating rewritten queries...")
-query_rewriter = '''You will be provided with an input query to answer questions. Your job is to process the query in the following manner: - paraphrase it in the form of a question if not already - keep it concise but no less than 15 words. expand logically if less than 15 words - fix any spelling/grammatical errors\nReturn only the processed query as your response\n========== USER INPUT ==========\n{}\n========== / USER INPUT =========\nProcessed Query:'''
+query_rewriter = '''Here is an input query to answer questions: "{}". Your job is to process the query in the following manner: - paraphrase it in the form of a question if not already - keep it concise but no less than 15 words. expand logically if less than 15 words - fix any spelling/grammatical errors. Please only return the paraphrased query in a json style: {{"paraphrased": PARAPHRASED_QUERY}}.'''
 batched_dataset = aio_dataset["system_prompt_clinical_test"].map(construct_rewriting_prompt).batch(batch_size=args.batch_size)
 rewritten_query_list = []
 for batch in tqdm(batched_dataset):
-    out = pipe(batch["rewriting_prompt"])
-    rewritten_query = [item[0]["generated_text"][-1]["content"] for item in out]
-    rewritten_query_list.extend(rewritten_query)
+    rewritten_queries = generate_valid_json(batch["rewriting_prompt"])
+    for i, query in enumerate(batch["query"]):
+        rewritten_query = deepcopy(query)
+        rewritten_query[-1]["content"] = rewritten_queries[i]
+        rewritten_query_list.append(rewritten_query)
 
-query_rewriter_dataset = aio_dataset["system_prompt_clinical_test"].add_column("rewritten_query", rewritten_query_list)
+query_rewriter_dataset = aio_dataset["system_prompt_clinical_test"].remove_columns("query")
+baseline_datasets["query_rewriter"] = query_rewriter_dataset.add_column("query", rewritten_query_list)
 
 for dataset_name, dataset in baseline_datasets.items():
     # if dataset_name == "ins_dataset":

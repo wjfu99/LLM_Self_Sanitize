@@ -71,20 +71,23 @@ def construct_rewriting_prompt(example):
             "role": "user",
             "content": query_rewriter.format(example["query"][-1]["content"])
         },
-        {
-            "role": "assistant",
-            "content": "{\"paraphrased\": "
-        }
+        # {
+        #     "role": "assistant",
+        #     "content": "{\"processed_query\": "
+        # }
     ]
     return example
 
 def generate_valid_json(prompt):
+    extracted_jsons = []
     out = pipe(prompt)
-    try:
-        return [json.loads(item[0]["generated_text"][-1]["content"])["paraphrased"] for item in out]
-    except json.JSONDecodeError:
-        logger.info("Invalid JSON format. Retrying...")
-        return generate_valid_json(prompt)
+    for item in out:
+        extracted_json = utils.extract_json(item[0]["generated_text"][-1]["content"])
+        if extracted_json is not None and "processed_query" in extracted_json:
+            extracted_jsons.append(str(extracted_json["processed_query"]))
+        else:
+            extracted_jsons.append(None)
+    return extracted_jsons
 # def query_rewritting_defense(example):
 
 logger.info("Loading the dataset...")
@@ -128,14 +131,17 @@ pipe = transformers.pipeline(
 pipe.tokenizer.pad_token_id = pipe.model.config.eos_token_id
 
 logger.info("Generating rewritten queries...")
-query_rewriter = '''Here is an input query to answer questions: "{}". Your job is to process the query in the following manner: - paraphrase it in the form of a question if not already - keep it concise but no less than 15 words. expand logically if less than 15 words - fix any spelling/grammatical errors. Please only return the paraphrased query in a json style: {{"paraphrased": PARAPHRASED_QUERY}}.'''
+query_rewriter = '''Here is an input query from the user: \n===== START OF THE INPUT QUERY =====\n{}\n=====  END OF THE INPUT QUERY   =====\n. Your job is to process the query in the following manner:\n- keep it concise but no less than 15 words. expand logically if less than 15 words.\n- fix any spelling/grammatical errors.\n- don't miss any information within the INPUT QUERY.\n- your response should be formated in a json style: {{"processed_query": PROCESSED_QUERY_HERE}}.'''
+
 batched_dataset = aio_dataset["system_prompt_clinical_test"].map(construct_rewriting_prompt).batch(batch_size=args.batch_size)
 rewritten_query_list = []
 for batch in tqdm(batched_dataset):
     rewritten_queries = generate_valid_json(batch["rewriting_prompt"])
     for i, query in enumerate(batch["query"]):
         rewritten_query = deepcopy(query)
-        rewritten_query[-1]["content"] = rewritten_queries[i]
+        # if the query cannot be rewritten, we will keep the original query
+        if rewritten_queries[i] is not None:
+            rewritten_query[-1]["content"] = rewritten_queries[i]
         rewritten_query_list.append(rewritten_query)
 
 query_rewriter_dataset = aio_dataset["system_prompt_clinical_test"].remove_columns("query")

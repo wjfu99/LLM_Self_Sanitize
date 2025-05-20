@@ -135,7 +135,7 @@ query_rewriter = '''Here is an input query from the user: \n===== START OF THE I
 
 batched_dataset = aio_dataset["system_prompt_clinical_test"].map(construct_rewriting_prompt).batch(batch_size=args.batch_size)
 rewritten_query_list = []
-for batch in tqdm(batched_dataset):
+for batch in tqdm(batched_dataset, desc="Generating"):
     rewritten_queries = generate_valid_json(batch["rewriting_prompt"])
     for i, query in enumerate(batch["query"]):
         rewritten_query = deepcopy(query)
@@ -147,7 +147,9 @@ for batch in tqdm(batched_dataset):
 query_rewriter_dataset = aio_dataset["system_prompt_clinical_test"].remove_columns("query")
 baseline_datasets["query_rewriter"] = query_rewriter_dataset.add_column("query", rewritten_query_list)
 
+logger.info("Generating responses for each baseline...")
 for dataset_name, dataset in baseline_datasets.items():
+    logger.info(f"Generating responses for {dataset_name}...")
     # if dataset_name == "ins_dataset":
     #     continue
     # dataset = datasets.load_from_disk(f"{args.output_dir}/{dataset_name}/{args.model_name}")
@@ -162,7 +164,7 @@ for dataset_name, dataset in baseline_datasets.items():
     accomplished_messages_list = []
     response_list = []
     batched_dataset = dataset["system_prompt_clinical_test"].batch(batch_size=args.batch_size)
-    for batch in tqdm(batched_dataset):
+    for batch in tqdm(batched_dataset, desc="Generating"):
         out = pipe(batch["query"])
         messages = [item[0]["generated_text"] for item in out]
         generated_text = [item[0]["generated_text"][-1]["content"] for item in out]

@@ -145,7 +145,9 @@ for batch in tqdm(batched_dataset, desc="Generating"):
         rewritten_query_list.append(rewritten_query)
 
 query_rewriter_dataset = aio_dataset["system_prompt_clinical_test"].remove_columns("query")
-baseline_datasets["query_rewriter"] = query_rewriter_dataset.add_column("query", rewritten_query_list)
+query_rewriter_dataset = query_rewriter_dataset.add_column("query", rewritten_query_list)
+baseline_datasets["query_rewriter"] = deepcopy(aio_dataset)
+baseline_datasets["query_rewriter"]["system_prompt_clinical_test"] = query_rewriter_dataset
 
 logger.info("Generating responses for each baseline...")
 for dataset_name, dataset in baseline_datasets.items():

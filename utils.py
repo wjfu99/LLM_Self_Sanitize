@@ -14,6 +14,7 @@ import warnings
 from typing import Union
 from rouge_score import rouge_scorer
 from nltk.translate.bleu_score import sentence_bleu
+import bert_score
 import evaluate
 import os
 import logging
@@ -82,6 +83,17 @@ def eval_bleu_hf(generated, target, tokenizer=None):
     scorer.add_batch(predictions=generated, references=target)
     scores = scorer.compute(tokenizer=tokenizer)
     return scores
+
+def eval_bert(generated, target):
+    precision, recall, f1 = bert_score.score(generated, target, lang="en", verbose=True)
+    precision = np.mean(precision.tolist())
+    recall = np.mean(recall.tolist())
+    f1 = np.mean(f1.tolist())
+    return {
+        "precision": precision,
+        "recall": recall,
+        "f1": f1,
+    }
 
 # The class of self-monitor model
 class FFSelfMonitor(torch.nn.Module):

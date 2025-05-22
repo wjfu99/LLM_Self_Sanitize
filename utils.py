@@ -160,10 +160,15 @@ def prepare_model_info(model_name, layer_number: Union[int, str]=-1):
     }
     return model_info[model_name]
 
-def print_chat(messages):
+def chat2str(messages):
+    chat_text = ""
     for m in messages:
-        print(f"{m['role']}======================================================")
-        print(f"{m['content']}")
+        chat_text += f"**************{m['role']}**************\n"
+        chat_text += f"{m['content']}\n"
+    return chat_text
+
+def print_chat(messages):
+    print(chat2str(messages))
     print("\n\n")
 
 def save_ff_representation(mod, inp, out, ff_rep, layer_num):

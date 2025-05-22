@@ -40,12 +40,12 @@ def get_logger(name: str, level: Literal["info", "warning", "debug"]) -> logging
 
 logger = get_logger(__name__, "info")
 
-def eval_rouge(generated, target, tokenizer=None):
+def eval_rouge(generated, target, tokenizer=None, measure="fmeasure"):
     scorer = rouge_scorer.RougeScorer(['rouge1', 'rouge2', 'rougeL'], use_stemmer=True, tokenizer=tokenizer)
     raw_scores = [scorer.score(t, r) for r, t in zip(generated, target)]
     avg_scores = {}
     for key in raw_scores[0].keys():
-        avg_scores[key] = np.mean([score[key].recall for score in raw_scores])
+        avg_scores[key] = np.mean([getattr(score[key], measure) for score in raw_scores])
     return avg_scores, raw_scores
     # return scores
 

@@ -51,7 +51,7 @@ for results_path in results_paths:
         neg_dataset = dataset.filter(lambda x: x['label']==0)
         
         logger.info("=======Malicious Query Scores=======")
-        rouge_scores, _ = utils.eval_rouge(pos_dataset["response"], pos_dataset["entities"], tokenizer)
+        rouge_scores, _ = utils.eval_rouge(pos_dataset["response"], pos_dataset["entities"], tokenizer, measure="recall")
         # rouge_scores_hf = utils.eval_rouge_hf(pos_dataset["response"], pos_dataset["entities"])
         bleu_scores = utils.eval_bleu(pos_dataset["response"], pos_dataset["entities"], tokenizer)
         bert_scores = utils.eval_bert(pos_dataset["response"], pos_dataset["entities"])
@@ -60,14 +60,14 @@ for results_path in results_paths:
         
         logger.info("=======Regular Query Scores=======")
         ground_truth = [messages[-1]["content"] for messages in neg_dataset["messages"]]
-        rouge_scores, _ = utils.eval_rouge(neg_dataset["response"], ground_truth, tokenizer)
+        rouge_scores, _ = utils.eval_rouge(neg_dataset["response"], ground_truth, tokenizer, measure="fmeasure")
         bleu_scores = utils.eval_bleu(neg_dataset["response"], ground_truth, tokenizer)
         bert_scores = utils.eval_bert(neg_dataset["response"], ground_truth)
         logger.info(f"bleu: {bleu_scores["bleu"]}, rouge1: {rouge_scores['rouge1']}, rouge2: {rouge_scores['rouge2']}, rougel: {rouge_scores['rougeL']}, bert: {bert_scores['f1']}")
         results.append(["regular", results_path.name, bleu_scores["bleu"], rouge_scores['rouge1'], rouge_scores['rouge2'], rouge_scores['rougeL'], bert_scores['f1']])
     
 results = pd.DataFrame(results, columns=["type", "defense", "bleu", "rouge1", "rouge2", "rougel", "bert"])
-results = results.melt(id_vars=["type", "defense"], value_vars=["bleu", "rouge1", "rouge2", "rougel", "bert"], var_name="metric", value_name="score")
+results = results.melt(id_vars=["type", "defense"], value_vars=["bleu", "rouge1", "rouge2", "rougel"], var_name="metric", value_name="score")
 
 fig, axes = plt.subplots(1, 2, figsize=(16, 6), sharey=True)
 

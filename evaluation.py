@@ -69,7 +69,7 @@ for results_path in results_paths:
 results = pd.DataFrame(results, columns=["type", "defense", "bleu", "rouge1", "rouge2", "rougel", "bert"])
 results = results.melt(id_vars=["type", "defense"], value_vars=["bleu", "rouge1", "rouge2", "rougel"], var_name="metric", value_name="score")
 
-fig, axes = plt.subplots(1, 2, figsize=(16, 6), sharey=True)
+fig, axes = plt.subplots(1, 2, figsize=(16, 6), sharey=False)
 
 # 第一个子图：malicious
 sns.barplot(

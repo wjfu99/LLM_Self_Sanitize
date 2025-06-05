@@ -188,6 +188,7 @@ baseline_datasets["query_rewriter"]["system_prompt_clinical_test"] = query_rewri
 logger.info("Generating responses for each baseline...")
 for dataset_name, dataset in baseline_datasets.items():
     logger.info(f"Generating responses for {dataset_name}...")
+    del_types = []
     for type in dataset.keys():
         if "query" in dataset[type].column_names:
             accomplished_messages_list = []
@@ -203,7 +204,9 @@ for dataset_name, dataset in baseline_datasets.items():
             dataset[type] = dataset[type].add_column("accomplished_messages", accomplished_messages_list)
         else:
             logger.info(f"Skipping {dataset_name} as this baseline is not applicable to {type} benchmark.")
-            del dataset[type]
+            del_types.append(type)
+    for type in del_types:
+        del dataset[type]
     dataset.save_to_disk(f"{args.output_dir}/{dataset_name}/{args.model_name}")
 
 logger.info("Generating responses for self-defense...")

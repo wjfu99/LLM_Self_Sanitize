@@ -134,6 +134,7 @@ pipe = transformers.pipeline(
     device=0,
     num_return_sequences=1,
     max_new_tokens=512,
+    torch_dtype=torch.bfloat16
 )
 pipe.tokenizer.pad_token_id = pipe.model.config.eos_token_id
 

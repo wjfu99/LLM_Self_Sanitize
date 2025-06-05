@@ -237,9 +237,9 @@ for type in original_dataset.keys():
             rewritten_message_list.append(rewritten_accomplished_messages)
             rewritten_response_list.append(rewritten_accomplished_messages[-1]["content"])
 
-    query_rewriter_dataset = original_dataset[type].remove_columns(["response", "accomplished_messages"])
-    query_rewriter_dataset = query_rewriter_dataset.add_column("response", rewritten_response_list)
-    query_rewriter_dataset = query_rewriter_dataset.add_column("accomplished_messages", rewritten_message_list)
-    original_dataset[type] = query_rewriter_dataset
+    self_defense_dataset = original_dataset[type].remove_columns(["response", "accomplished_messages"])
+    self_defense_dataset = self_defense_dataset.add_column("response", rewritten_response_list)
+    self_defense_dataset = self_defense_dataset.add_column("accomplished_messages", rewritten_message_list)
+    original_dataset[type] = self_defense_dataset
 
 original_dataset.save_to_disk(f"{args.output_dir}/self_defense/{args.model_name}")

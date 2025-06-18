@@ -34,7 +34,8 @@ tokenizer = AutoTokenizer.from_pretrained(args.model_name)
 
 results = []
 for results_path in results_paths:
-    logger.info(f"\n==========================Evaluating {results_path.name}==========================")
+    algorithm_name = results_path.name
+    logger.info(f"\n==========================Evaluating {algorithm_name}==========================")
     output_dataset = datasets.load_from_disk(results_path / args.model_name)
     for key, dataset in output_dataset.items():
         match = re.match(r"([a-zA-Z0-9_]+)_(train|test)", key)
@@ -57,7 +58,7 @@ for results_path in results_paths:
         # bert_scores = utils.eval_bert(pos_dataset["response"], pos_dataset["entities"])
         bert_scores = {"f1": 0}
         logger.info(f"bleu: {bleu_scores["bleu"]}, rouge1: {rouge_scores['rouge1']}, rouge2: {rouge_scores['rouge2']}, rougel: {rouge_scores['rougeL']}, bert: {bert_scores['f1']}")
-        results.append(["malicious", results_path.name, bleu_scores["bleu"], rouge_scores['rouge1'], rouge_scores['rouge2'], rouge_scores['rougeL'], bert_scores['f1']])
+        results.append(["malicious", algorithm_name, bleu_scores["bleu"], rouge_scores['rouge1'], rouge_scores['rouge2'], rouge_scores['rougeL'], bert_scores['f1']])
         
         logger.info("=======Regular Query Scores=======")
         ground_truth = [messages[-1]["content"] for messages in neg_dataset["messages"]]
@@ -66,7 +67,7 @@ for results_path in results_paths:
         # bert_scores = utils.eval_bert(neg_dataset["response"], ground_truth)
         bert_scores = {"f1": 0}
         logger.info(f"bleu: {bleu_scores["bleu"]}, rouge1: {rouge_scores['rouge1']}, rouge2: {rouge_scores['rouge2']}, rougel: {rouge_scores['rougeL']}, bert: {bert_scores['f1']}")
-        results.append(["regular", results_path.name, bleu_scores["bleu"], rouge_scores['rouge1'], rouge_scores['rouge2'], rouge_scores['rougeL'], bert_scores['f1']])
+        results.append(["regular", algorithm_name, bleu_scores["bleu"], rouge_scores['rouge1'], rouge_scores['rouge2'], rouge_scores['rougeL'], bert_scores['f1']])
     
 results = pd.DataFrame(results, columns=["type", "defense", "bleu", "rouge1", "rouge2", "rougel", "bert"])
 results = results.melt(id_vars=["type", "defense"], value_vars=["bleu", "rouge1", "rouge2", "rougel"], var_name="metric", value_name="score")

@@ -54,7 +54,8 @@ for results_path in results_paths:
         rouge_scores, _ = utils.eval_rouge(pos_dataset["response"], pos_dataset["entities"], tokenizer, measure="recall")
         # rouge_scores_hf = utils.eval_rouge_hf(pos_dataset["response"], pos_dataset["entities"])
         bleu_scores = utils.eval_bleu(pos_dataset["response"], pos_dataset["entities"], tokenizer)
-        bert_scores = utils.eval_bert(pos_dataset["response"], pos_dataset["entities"])
+        # bert_scores = utils.eval_bert(pos_dataset["response"], pos_dataset["entities"])
+        bert_scores = {"f1": 0}
         logger.info(f"bleu: {bleu_scores["bleu"]}, rouge1: {rouge_scores['rouge1']}, rouge2: {rouge_scores['rouge2']}, rougel: {rouge_scores['rougeL']}, bert: {bert_scores['f1']}")
         results.append(["malicious", results_path.name, bleu_scores["bleu"], rouge_scores['rouge1'], rouge_scores['rouge2'], rouge_scores['rougeL'], bert_scores['f1']])
         
@@ -62,7 +63,8 @@ for results_path in results_paths:
         ground_truth = [messages[-1]["content"] for messages in neg_dataset["messages"]]
         rouge_scores, _ = utils.eval_rouge(neg_dataset["response"], ground_truth, tokenizer, measure="fmeasure")
         bleu_scores = utils.eval_bleu(neg_dataset["response"], ground_truth, tokenizer)
-        bert_scores = utils.eval_bert(neg_dataset["response"], ground_truth)
+        # bert_scores = utils.eval_bert(neg_dataset["response"], ground_truth)
+        bert_scores = {"f1": 0}
         logger.info(f"bleu: {bleu_scores["bleu"]}, rouge1: {rouge_scores['rouge1']}, rouge2: {rouge_scores['rouge2']}, rougel: {rouge_scores['rougeL']}, bert: {bert_scores['f1']}")
         results.append(["regular", results_path.name, bleu_scores["bleu"], rouge_scores['rouge1'], rouge_scores['rouge2'], rouge_scores['rougeL'], bert_scores['f1']])
     

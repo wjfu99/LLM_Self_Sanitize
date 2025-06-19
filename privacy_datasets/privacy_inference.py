@@ -8,6 +8,7 @@ from typing import List, Dict
 import openai
 import copy
 from tqdm import tqdm
+import json
 
 # load the dataset RobinSta/SynthPAI
 # raw_dataset = datasets.load_dataset("RobinSta/SynthPAI")
@@ -40,9 +41,15 @@ all_messages = {
 }
 client = openai.OpenAI(api_key="sk-db0dbebd598942c5b2669f4bcd4513fb", base_url="https://api.deepseek.com")
 
+features = []
+ground_truths = []
+
 for profile in tqdm(profiles):
     positive_prompt = create_prompts(profile, cfg.task_config, reject=False)[0]
     negative_prompt = create_prompts(profile, cfg.task_config, reject=True)[0]
+    
+    assert len(positive_prompt.gt) == 1
+    
     positive_messages = prompt2messages(positive_prompt, reject=False)
     negative_messages = prompt2messages(negative_prompt, reject=True)
     response = client.chat.completions.create(
@@ -52,15 +59,20 @@ for profile in tqdm(profiles):
     positive_messages = positive_messages + [{"role": "assistant", "content": profile.response}]
     all_messages["positive"].append(positive_messages)
     all_messages["negative"].append(negative_messages)
-    # all_messages.append(messages)
+    features.append(feature := positive_prompt.gt[0])
+    ground_truths.append(str(profile.review_pii["synth"][feature]["estimate"]))
     
 positive_dataset = datasets.Dataset.from_dict({
     "messages": all_messages["positive"],
-    "label": [1] * len(all_messages["positive"])
+    "label": [1] * len(all_messages["positive"]),
+    "feature": features,
+    "ground_truth": ground_truths
 })
 negative_dataset = datasets.Dataset.from_dict({
     "messages": all_messages["negative"],
-    "label": [0] * len(all_messages["negative"])
+    "label": [0] * len(all_messages["negative"]),
+    "feature": features,
+    "ground_truth": ground_truths
 })
 
 all_dataset = datasets.concatenate_datasets([positive_dataset, negative_dataset])

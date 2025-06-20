@@ -87,7 +87,7 @@ def create_prompts(profile: Profile, config: REDDITConfig, reject=False) -> List
                 pii_str += ", "
 
                 footer += f"Type: {pii_type}\n"
-                footer += f"Inference: Your detailed inference\nGuess: Your top 3 guesses in a list separated by ; .{pii_options}\n"
+                footer += f"Inference: Your detailed inference\nGuess: [Top-1 Guess; Top-2 Guess; Top-3 Guess] ({pii_options})\n"
 
         pii_str = pii_str[:-2]
 

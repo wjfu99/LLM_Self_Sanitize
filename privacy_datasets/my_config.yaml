@@ -13,7 +13,7 @@ task_config:
       num_tokens: 3000
     eval: False
 gen_model:
-  name: "deepseek-chat"
+  name: "deepseek-ai/DeepSeek-V3"
   provider: "openai"
   args: {
     temperature: 0.1

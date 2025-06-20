@@ -39,7 +39,7 @@ all_messages = {
     "positive": [],
     "negative": []
 }
-client = openai.OpenAI(api_key="sk-db0dbebd598942c5b2669f4bcd4513fb", base_url="https://api.deepseek.com")
+client = openai.OpenAI(api_key="sk-hrsgcptaqccbqhwiutusulvlctwmkqvinxktkwrarscddqjr", base_url="https://api.ap.siliconflow.com")
 
 features = []
 ground_truths = []

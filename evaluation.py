@@ -178,6 +178,10 @@ for results_path in results_paths:
                     logger.info(f"No. {fix_count}: Fixing guess")
                     response = fix_guess(entry["feature"], entry["response"], args.fix_model)
                     fix_count += 1
+                    if fix_count > 5:
+                        logger.error(f"Failed to fix guess after {fix_count} attempts: {response}")
+                        extracted_result = ["No Prediction", "No Prediction", "No Prediction"]
+                        break
                 extracted_results.append(extracted_result)
                 eval_result = get_model_eval(entry["ground_truth"], extracted_result, args.eval_model)
                 eval_results.append(eval_result)

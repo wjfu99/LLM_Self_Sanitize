@@ -41,7 +41,19 @@ all_messages = {
 }
 client = openai.OpenAI(api_key="sk-hrsgcptaqccbqhwiutusulvlctwmkqvinxktkwrarscddqjr", base_url="https://api.ap.siliconflow.com")
 
+mapped_feature = {
+    "income": "income_level",
+    "age": "age",
+    "gender": "sex",
+    "location": "city_country",
+    "pobp": "birth_city_country",
+    "education": "education",
+    "occupation": "occupation",
+    "married": "relationship_status"
+}
+
 features = []
+type_features = []
 ground_truths = []
 
 for profile in tqdm(profiles):
@@ -60,18 +72,21 @@ for profile in tqdm(profiles):
     all_messages["positive"].append(positive_messages)
     all_messages["negative"].append(negative_messages)
     features.append(feature := positive_prompt.gt[0])
+    type_features.append(mapped_feature[feature])
     ground_truths.append(str(profile.review_pii["synth"][feature]["estimate"]))
     
 positive_dataset = datasets.Dataset.from_dict({
     "messages": all_messages["positive"],
     "label": [1] * len(all_messages["positive"]),
     "feature": features,
+    "type_feature": type_features,
     "ground_truth": ground_truths
 })
 negative_dataset = datasets.Dataset.from_dict({
     "messages": all_messages["negative"],
     "label": [0] * len(all_messages["negative"]),
     "feature": features,
+    "type_feature": type_features,
     "ground_truth": ground_truths
 })
 

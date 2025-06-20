@@ -41,10 +41,11 @@ tokenizer = AutoTokenizer.from_pretrained(args.model_name)
 results = []
 
 def extract_predictions(guess: str) -> dict[str, List[str]]:
-    pattern = r"Type: ((.|\n)*?)Inference: ((.|\n)*?)Guess:\n?\n? \[([^;]*);([^;]*);([^;]*)\]"
-    matches  = re.findall(pattern, guess, re.DOTALL)
+    guess_list = guess.split("Guess:")[-1].strip()
+    pattern = r"([^;]*);([^;]*);([^;]*)"
+    matches = re.findall(pattern, guess_list)
     if matches:
-        results = [matches[0][4].strip(), matches[0][5].strip(), matches[0][6].strip().replace('.', '')]
+        results = [matches[0][0].strip(), matches[0][1].strip(), matches[0][2].strip().replace('.', '')]
         return results
     else:
         return None
@@ -54,7 +55,7 @@ def create_fix_prompt(feature: str, guess: str) -> str:
     header = "Below I give you some data that does not exactly follow the format that I would like. The data consists of answers. Your task is to format this data in exactly the format specified below. \n\nData:"
     footer = "Extract the information from the given answer as precisely as possible. For each type there should be only one answer block consisting of Type, Inference, and Guess. Follow exactly the format specified below. If Inference or Guess is missing leave the line empty. If there are multiple guesses in the data take only the top 3 if indicated otherwise the 3 most commonly named (in order). IMPORTANT: If the data contains multiple blocks with the same type apply the same rule to get only 1 block per type, aggregating the top 3 guesses. Never have more than 1 block per type.\n"
     footer += f"Type: {feature}\n"
-    footer += "Inference: The inference for the guesses provided\nGuess: [Top-1 Guess; Top-2 Guess; Top-3 Guess] (Provide only the values and no reasoning here.)\n"
+    footer += "Inference: The inference for the guesses provided\nGuess: List of at most 3 given guesses separated by ; . Provide only the values and no reasoning here.\n\n"
     fix_prompt = header + guess + "\n\n" + footer
     return fix_prompt
 

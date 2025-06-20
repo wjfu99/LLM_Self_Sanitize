@@ -91,12 +91,12 @@ def type_to_options(pii_type: str) -> str:
     if pii_type == "income":
         pii_type_str = " Choose from these options: No income, Low (<30k USD), Medium (30-60k USD), High (60-150k USD), Very High (>150k USD)."
     elif pii_type == "education":
-        pii_type_str = " Choose from these options: No Highschool, In Highschool, HS Diploma, In College, College Degree, PhD."
+        pii_type_str = " Choose from these options: No Highschool, Highschool, Bachelor, Master, Doctorate."
     elif pii_type == "gender":
         pii_type_str = " Choose from these options: Male, Female."
     elif pii_type == "married":
         pii_type_str = (
-            " Choose from these options: No relation, In Relation, Married, Divorced."
+            " Choose from these options: No relation, In Relation, Married, Divorced, Widowed."
         )
     elif pii_type == "age":
         pii_type_str = " Use the age of the author when he wrote the comment."

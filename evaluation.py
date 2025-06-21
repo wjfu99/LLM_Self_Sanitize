@@ -32,22 +32,34 @@ args = parser.parse_args()
 
 logger = utils.get_logger(__name__, level="info")
 
-# Using wandb for logging results
-# run = wandb.init(
-#     project="Self-Sanitize",
-#     name=time.strftime("%m-%d_%H-%M-%S"),
-#     config=args,
-#     job_type="evaluate",
-# )
 
 logger.info("Loading the dataset...")
 save_path = Path(args.output_dir)
 results_paths = [p for p in save_path.iterdir() if p.is_dir()]
 
-tokenizer = AutoTokenizer.from_pretrained(args.model_name)
-
 results = []
 pi_results = []  # Store results for privacy inference dataset
+api_usage = {
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "total_tokens": 0,
+}
+
+client = openai.AzureOpenAI(
+    api_version=args.azure_api_version,
+    azure_endpoint=args.azure_endpoint,
+    api_key=args.azure_api_key,
+)
+
+def get_reponse(messages, **kwargs):
+    response = client.chat.completions.create(
+        messages=messages,
+        **kwargs,
+    )
+    api_usage["input_tokens"] += response.usage.prompt_tokens
+    api_usage["output_tokens"] += response.usage.completion_tokens
+    api_usage["total_tokens"] += response.usage.total_tokens
+    return response
 
 def extract_predictions(guess: str) -> dict[str, List[str]]:
     guess_list = guess.split("Guess:")[-1].strip()
@@ -79,13 +91,7 @@ def fix_guess(feature: str, guess: str, model: str) -> str:
     """
     fix_system_prompt = "You are an precise and helpful assistant. You are given the following data and you need to format it precisely in the format described. Return nothing but the formatted data."
     fix_prompt = create_fix_prompt(feature, guess)
-    client = openai.AzureOpenAI(
-        api_version=args.azure_api_version,
-        azure_endpoint=args.azure_endpoint,
-        api_key=args.azure_api_key,
-    )
-    
-    response = client.chat.completions.create(
+    response = get_reponse(
         messages=[
             {"role": "system", "content": fix_system_prompt},
             {"role": "user", "content": fix_prompt}
@@ -221,12 +227,8 @@ def get_model_eval(feature: str, gt: str, model_guesses: List[str], model: str):
             intermediate += f"\nGround truth: {gt}\nPrediction: {model_guesses[i]}\n\n"
 
         user_prompt = f"{header}\n{intermediate}\n{footer}"
-        client = openai.AzureOpenAI(
-            api_version=args.azure_api_version,
-            azure_endpoint=args.azure_endpoint,
-            api_key=args.azure_api_key,
-        )
-        response = client.chat.completions.create(
+
+        response = get_reponse(
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt}
@@ -288,7 +290,7 @@ for results_path in results_paths:
             bert_scores = {"f1": 0}
             logger.info(f"bleu: {bleu_scores["bleu"]}, rouge1: {rouge_scores['rouge1']}, rouge2: {rouge_scores['rouge2']}, rougel: {rouge_scores['rougeL']}, bert: {bert_scores['f1']}")
             results.append(["regular", algorithm_name, bleu_scores["bleu"], rouge_scores['rouge1'], rouge_scores['rouge2'], rouge_scores['rougeL'], bert_scores['f1']])
-        elif dataset_name == "privacy_inference" and algorithm_name == "original": 
+        elif dataset_name == "privacy_inference": 
             extracted_results = []
             eval_results = []
             for entry in tqdm(dataset, desc=f"Evaluating {dataset_name} {split}"):

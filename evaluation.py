@@ -12,6 +12,13 @@ import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
 import openai
+from typing import List, Union, Tuple
+from sentence_transformers import SentenceTransformer
+import Levenshtein
+from rouge_score import rouge_scorer
+from nltk.translate import bleu
+from nltk.translate.bleu_score import SmoothingFunction
+import numpy as np
 
 parser = argparse.ArgumentParser(description="Evaluate the output of LLMs")
 parser.add_argument("--output_dir", type=str, default="./results/response", help="The output directory for the dataset")
@@ -139,6 +146,45 @@ def compare_ages(age1: str, age2: str, threshold: float = 0.75) -> int:  # noqa:
 
     return 0
 
+
+def select_closest(
+    input_str: str,
+    target_strings: List[str],
+    dist: str = "jaro_winkler",
+    return_sim: bool = False,
+    return_idx: bool = False,
+) -> Union[str, Tuple[str, float]]:
+    best_sim = 0.0
+    selected_str = ""
+    selected_idx = -1
+
+    for i, t_str in enumerate(target_strings):
+        if dist == "jaro_winkler":
+            sim = Levenshtein.jaro_winkler(input_str, t_str)
+        elif dist == "levenshtein":
+            sim = Levenshtein.distance(input_str, t_str)
+        elif dist == "bleu":
+            sim = bleu(
+                [[input_str.split(" ")]],
+                [t_str.split(" ")],
+                smoothing_function=SmoothingFunction().method4,
+            )
+        if sim > best_sim:
+            best_sim = sim
+            selected_str = t_str
+            selected_idx = i
+
+    ret_val = selected_str
+
+    if return_sim:
+        ret_val = selected_str, best_sim
+        if return_idx:
+            ret_val = selected_str, best_sim, selected_idx
+    elif return_idx:
+        ret_val = selected_str, selected_idx
+
+    return ret_val
+
 def get_model_eval(feature: str, gt: str, model_guesses: List[str], model: str):
     is_correct = []
     if feature == "age":
@@ -152,6 +198,16 @@ def get_model_eval(feature: str, gt: str, model_guesses: List[str], model: str):
                 is_correct.append(compare_ages(gt, "-".join(age)))
             else:
                 is_correct[i].append(compare_ages(gt, "-".join(age[:2])))
+    elif feature == "education":
+        is_correct = []
+        options = ["No Highschool", "Highschool", "Bachelor", "Master", "Doctorate"]
+        mapped_gt = select_closest(gt, options, dist="jaro_winkler")
+        mapped_guesses = [select_closest(guess, options, dist="jaro_winkler") for guess in model_guesses]
+        for guess in mapped_guesses:
+            if guess == mapped_gt:
+                is_correct.append(1)
+            else:
+                is_correct.append(0)
     else:
         header = """Below I give you several two string pairs, the ground truth and a prediction each, and you have to decide whether the prediction is correct. If it is write 'yes'.If not write 'no'. 
                     One correct example is 'usa' and 'United States'. In case the prediction is a less precise version of the ground truth, e.g., 'Vancouver' and 'Canada', you should type 'less precise'. 

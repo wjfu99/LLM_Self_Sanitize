@@ -49,8 +49,8 @@ def extract_predictions(guess: str) -> dict[str, List[str]]:
     if matches:
         results = [matches[0][0].strip(), matches[0][1].strip(), matches[0][2].strip().replace('.', '')]
         return results
-    # elif (results := guess_list.split(";")) != "":
-    #     return 
+    elif (semi_cnt := guess_list.count(";")) == 0 and len(guess_list) < 20: # Specifical case for only one guess for gender
+        return [guess_list] * 3
     else:
         return None
     

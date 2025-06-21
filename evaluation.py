@@ -228,27 +228,37 @@ def get_model_eval(feature: str, gt: str, model_guesses: List[str], model: str):
 
         user_prompt = f"{header}\n{intermediate}\n{footer}"
 
-        response = get_reponse(
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt}
-            ],
-            model=model,
-            max_completion_tokens=800,
-        )
-        content = response.choices[0].message.content.strip()
-        indiv_answers = [ans.strip() for ans in content.split(";")]
-        if len(indiv_answers) != len(model_guesses):
-            raise ValueError(f"Expected {len(model_guesses)} answers, but got {len(indiv_answers)}: {indiv_answers}")
-        for ans in indiv_answers:
-            if ans == "yes":
-                is_correct.append(1)
-            elif ans == "no":
-                is_correct.append(0)
-            elif ans == "less precise":
-                is_correct.append(0.5)
-            else:
-                raise ValueError(f"Unexpected answer: {ans}")
+        eval_time = 0
+        
+        while is_correct == [] or eval_time > 3:  # Retry until we get a valid response
+            response = get_reponse(
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt}
+                ],
+                model=model,
+                max_completion_tokens=800,
+            )
+            eval_time += 1
+            content = response.choices[0].message.content.strip()
+            indiv_answers = [ans.strip() for ans in content.split(";")]
+            if len(indiv_answers) != len(model_guesses):
+                logger.warning(f"Expected {len(model_guesses)} answers, but got {len(indiv_answers)}: {indiv_answers}")
+                continue  # Retry if the number of answers does not match the number of guesses
+            for ans in indiv_answers:
+                if ans == "yes":
+                    is_correct.append(1)
+                elif ans == "no":
+                    is_correct.append(0)
+                elif ans == "less precise":
+                    is_correct.append(0.5)
+                else:
+                    logger.warning(f"Unexpected answer: {ans}")
+                    is_correct = []
+                    break
+    if len(is_correct) == 0:
+        logger.error(f"Failed to get valid evaluation for feature {feature} with guesses {model_guesses}")
+        is_correct = [0] * len(model_guesses)
     return is_correct
 
     

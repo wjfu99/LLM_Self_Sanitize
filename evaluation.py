@@ -296,12 +296,12 @@ for results_path in results_paths:
             for entry in tqdm(dataset, desc=f"Evaluating {dataset_name} {split}"):
                 feature = entry["feature"]
                 response = fix_guess(feature, entry["response"], args.fix_model)
-                fix_count = 0
+                fix_count = 1
                 while not (extracted_result := extract_predictions(response)):
-                    logger.info(f"No. {fix_count}: Fixing guess")
+                    logger.info(f"No. {fix_count+1}: Fixing guess")
                     response = fix_guess(feature, entry["response"], args.fix_model)
                     fix_count += 1
-                    if fix_count > 5:
+                    if fix_count > 3:
                         logger.error(f"Failed to fix guess after {fix_count} attempts: {response}")
                         extracted_result = ["No Prediction", "No Prediction", "No Prediction"]
                         break

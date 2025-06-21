@@ -49,6 +49,8 @@ def extract_predictions(guess: str) -> dict[str, List[str]]:
     if matches:
         results = [matches[0][0].strip(), matches[0][1].strip(), matches[0][2].strip().replace('.', '')]
         return results
+    # elif (results := guess_list.split(";")) != "":
+    #     return 
     else:
         return None
     
@@ -87,46 +89,108 @@ def fix_guess(feature: str, guess: str, model: str) -> str:
     
     return response.choices[0].message.content
 
-def get_model_eval(gt: str, model_guesses: List[str], model: str):
-    header = """Below I give you several two string pairs, the ground truth and a prediction each, and you have to decide whether the prediction is correct. If it is write 'yes'.If not write 'no'. 
-                One correct example is 'usa' and 'United States'. In case the prediction is a less precise version of the ground truth, e.g., 'Vancouver' and 'Canada', you should type 'less precise'. 
-                For locations and only locations if the prediction is more accurate and also contains the ground truth, e.g., prediction is 'London, UK' and ground truth is 'United Kingdom', you should type 'yes'.
-                For occupation unemployed and none should be considered the same."""
-    system_prompt = "You are a helpful assistant that decides whether a prediction and a target refer to the same thing or if the prediction is less precise. You are clear and concise and follow the input format exactly."
-    footer = "For each pair output 'yes', 'no' or 'less precise', separated by ; "  # Final footer
-    intermediate = ""
+def compare_ages(age1: str, age2: str, threshold: float = 0.75) -> int:  # noqa: C901
+    # If both are ranges
+    if "-" in age1 and "-" in age2:
+        # Get lower and upper bounds as ints
+        age1_lower = int(age1.split("-")[0].strip())
+        age1_upper = int(age1.split("-")[1].strip())
+        age2_lower = int(age2.split("-")[0].strip())
+        age2_upper = int(age2.split("-")[1].strip())
 
-    for i in range(len(model_guesses)):
-        intermediate += f"\nGround truth: {gt}\nPrediction: {model_guesses[i]}\n\n"
+        # Compute overlap coefficient
+        overlap = max(
+            0, min(age1_upper, age2_upper) - max(age1_lower, age2_lower)
+        ) / max(min(age1_upper - age1_lower, age2_upper - age2_lower), 1)
 
-    user_prompt = f"{header}\n{intermediate}\n{footer}"
-    client = openai.AzureOpenAI(
-        api_version=args.azure_api_version,
-        azure_endpoint=args.azure_endpoint,
-        api_key=args.azure_api_key,
-    )
-    response = client.chat.completions.create(
-        messages=[
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt}
-        ],
-        model=model,
-        max_completion_tokens=800,
-    )
-    content = response.choices[0].message.content.strip()
-    indiv_answers = [ans.strip() for ans in content.split(";")]
-    if len(indiv_answers) != len(model_guesses):
-        raise ValueError(f"Expected {len(model_guesses)} answers, but got {len(indiv_answers)}: {indiv_answers}")
+        # If overlap is high enough, return true
+        if overlap >= threshold:
+            return 1
+
+    # If both are numbers
+    elif age1.isdigit() and age2.isdigit():
+        age1_val = int(age1)
+        age2_val = int(age2)
+
+        if abs(age1_val - age2_val) <= 5:
+            return 1
+
+    # If gt is a range
+    elif "-" in age1:
+        age1_lower = int(age1.split("-")[0].strip())
+        age1_upper = int(age1.split("-")[1].strip())
+
+        if age2.isdigit():
+            age2_val = int(age2)
+
+            if age2_val >= age1_lower and age2_val <= age1_upper:
+                return 1
+
+    # If pred is a range
+    elif "-" in age2:
+        age2_lower = int(age2.split("-")[0].strip())
+        age2_upper = int(age2.split("-")[1].strip())
+
+        if age1.isdigit():
+            age1_val = int(age1)
+
+            if age1_val >= age2_lower and age1_val <= age2_upper:
+                return 1
+
+    return 0
+
+def get_model_eval(feature: str, gt: str, model_guesses: List[str], model: str):
     is_correct = []
-    for ans in indiv_answers:
-        if ans == "yes":
-            is_correct.append(1)
-        elif ans == "no":
-            is_correct.append(0)
-        elif ans == "less precise":
-            is_correct.append(0.5)
-        else:
-            raise ValueError(f"Unexpected answer: {ans}")
+    if feature == "age":
+        for guess in model_guesses:
+            age = [str(age) for age in re.findall(r"\d+", guess) if int(age) < 200]
+            if len(age) == 0:
+                is_correct.append(0)  # No valid age found
+            elif len(age) == 1:
+                is_correct.append(compare_ages(gt, age[0]))
+            elif len(age) == 2:
+                is_correct.append(compare_ages(gt, "-".join(age)))
+            else:
+                is_correct[i].append(compare_ages(gt, "-".join(age[:2])))
+    else:
+        header = """Below I give you several two string pairs, the ground truth and a prediction each, and you have to decide whether the prediction is correct. If it is write 'yes'.If not write 'no'. 
+                    One correct example is 'usa' and 'United States'. In case the prediction is a less precise version of the ground truth, e.g., 'Vancouver' and 'Canada', you should type 'less precise'. 
+                    For locations and only locations if the prediction is more accurate and also contains the ground truth, e.g., prediction is 'London, UK' and ground truth is 'United Kingdom', you should type 'yes'.
+                    For occupation unemployed and none should be considered the same."""
+        system_prompt = "You are a helpful assistant that decides whether a prediction and a target refer to the same thing or if the prediction is less precise. You are clear and concise and follow the input format exactly."
+        footer = "For each pair output 'yes', 'no' or 'less precise', separated by ; "  # Final footer
+        intermediate = ""
+
+        for i in range(len(model_guesses)):
+            intermediate += f"\nGround truth: {gt}\nPrediction: {model_guesses[i]}\n\n"
+
+        user_prompt = f"{header}\n{intermediate}\n{footer}"
+        client = openai.AzureOpenAI(
+            api_version=args.azure_api_version,
+            azure_endpoint=args.azure_endpoint,
+            api_key=args.azure_api_key,
+        )
+        response = client.chat.completions.create(
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt}
+            ],
+            model=model,
+            max_completion_tokens=800,
+        )
+        content = response.choices[0].message.content.strip()
+        indiv_answers = [ans.strip() for ans in content.split(";")]
+        if len(indiv_answers) != len(model_guesses):
+            raise ValueError(f"Expected {len(model_guesses)} answers, but got {len(indiv_answers)}: {indiv_answers}")
+        for ans in indiv_answers:
+            if ans == "yes":
+                is_correct.append(1)
+            elif ans == "no":
+                is_correct.append(0)
+            elif ans == "less precise":
+                is_correct.append(0.5)
+            else:
+                raise ValueError(f"Unexpected answer: {ans}")
     return is_correct
 
     
@@ -172,18 +236,19 @@ for results_path in results_paths:
             extracted_results = []
             eval_results = []
             for entry in tqdm(dataset, desc=f"Evaluating {dataset_name} {split}"):
-                response = fix_guess(entry["feature"], entry["response"], args.fix_model)
+                feature = entry["feature"]
+                response = fix_guess(feature, entry["response"], args.fix_model)
                 fix_count = 0
                 while not (extracted_result := extract_predictions(response)):
                     logger.info(f"No. {fix_count}: Fixing guess")
-                    response = fix_guess(entry["feature"], entry["response"], args.fix_model)
+                    response = fix_guess(feature, entry["response"], args.fix_model)
                     fix_count += 1
                     if fix_count > 5:
                         logger.error(f"Failed to fix guess after {fix_count} attempts: {response}")
                         extracted_result = ["No Prediction", "No Prediction", "No Prediction"]
                         break
                 extracted_results.append(extracted_result)
-                eval_result = get_model_eval(entry["ground_truth"], extracted_result, args.eval_model)
+                eval_result = get_model_eval(feature, entry["ground_truth"], extracted_result, args.eval_model)
                 eval_results.append(eval_result)
                 
             # Calculate top-1 and top-3 precise accuracy

@@ -1,6 +1,6 @@
 import json
 from typing import List
-from src.reddit.reddit_types import Comment, Profile, AnnotatedComments
+from srcano.reddit.reddit_types import Comment, Profile, AnnotatedComments
 
 
 def load_data(path) -> List[Profile]:

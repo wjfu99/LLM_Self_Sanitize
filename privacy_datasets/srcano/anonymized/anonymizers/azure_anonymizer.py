@@ -2,9 +2,9 @@ from typing import Iterator
 from .anonymizer import Anonymizer
 from azure.core.credentials import AzureKeyCredential
 from azure.ai.textanalytics import TextAnalyticsClient, DocumentError
-from src.utils.string_utils import anonymize_str
-from src.configs import AnonymizerConfig
-from src.reddit.reddit_types import Comment, AnnotatedComments, Profile
+from srcano.utils.string_utils import anonymize_str
+from srcano.configs import AnonymizerConfig
+from srcano.reddit.reddit_types import Comment, AnnotatedComments, Profile
 import credentials
 
 

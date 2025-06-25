@@ -3,8 +3,8 @@ import os
 
 from ollama import generate as ol_generate
 import ollama
-from src.configs import ModelConfig
-from src.prompts import Prompt
+from srcano.configs import ModelConfig
+from srcano.prompts import Prompt
 from .model import BaseModel
 
 

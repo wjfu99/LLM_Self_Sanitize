@@ -5,8 +5,8 @@ import os
 
 sys.path.append(os.path.join(os.path.dirname(__file__), "..", ".."))
 
-from src.reddit.reddit_utils import load_data
-from src.reddit.reddit_types import Profile
+from srcano.reddit.reddit_utils import load_data
+from srcano.reddit.reddit_types import Profile
 from typing import List
 
 

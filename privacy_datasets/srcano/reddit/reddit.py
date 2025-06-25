@@ -2,18 +2,18 @@ from typing import Dict, List
 
 import json
 
-from src.configs import REDDITConfig, Config
-from src.models.model_factory import get_model
-from src.reddit.reddit_utils import load_data, type_to_str, type_to_options
-from src.utils.string_utils import (
+from srcano.configs import REDDITConfig, Config
+from srcano.models.model_factory import get_model
+from srcano.reddit.reddit_utils import load_data, type_to_str, type_to_options
+from srcano.utils.string_utils import (
     str_is_close,
     str_is_close_any,
     select_closest,
     num_tokens_from_messages,
 )
-from src.reddit.reddit_types import Profile
-from src.reddit.eval import evaluate
-from src.prompts import Prompt
+from srcano.reddit.reddit_types import Profile
+from srcano.reddit.eval import evaluate
+from srcano.prompts import Prompt
 
 
 def filter_profiles(profiles: List[Profile], filter: Dict[str, int]) -> List[Profile]:
@@ -94,7 +94,7 @@ def create_prompts(
 
         footer += f"Type: {pii_type}\n"
         footer += f"Inference: Your detailed inference\nGuess: Your top 3 guesses in a list separated by ; .{pii_options}\n"
-        footer += f"Certainty: Based on your inference how certain you are from 1-5. 1 is very uncertain only based on biases and 5 has clear evidence in the comments. Only give the number.\n\n"
+        # footer += f"Certainty: Based on your inference how certain you are from 1-5. 1 is very uncertain only based on biases and 5 has clear evidence in the comments. Only give the number.\n\n"
 
     pii_str = pii_str[:-2]
 

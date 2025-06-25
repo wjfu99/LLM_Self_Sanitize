@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from typing import List, Iterator
-from src.reddit.reddit_types import Profile
+from srcano.reddit.reddit_types import Profile
 
 
 class Anonymizer(ABC):

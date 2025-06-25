@@ -1,4 +1,4 @@
-from src.configs import ModelConfig
+from srcano.configs import ModelConfig
 
 from .model import BaseModel
 from .open_ai import OpenAIGPT

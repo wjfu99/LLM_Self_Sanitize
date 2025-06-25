@@ -1,7 +1,7 @@
 from typing import List, Dict, Iterator, Tuple
 import torch
-from src.configs import ModelConfig
-from src.prompts import Prompt
+from srcano.configs import ModelConfig
+from srcano.prompts import Prompt
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from .model import BaseModel
 

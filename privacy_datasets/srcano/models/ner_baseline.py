@@ -10,8 +10,8 @@ from azure.ai.textanalytics import TextAnalyticsClient, DocumentError
 from azure.core.credentials import AzureKeyCredential
 import credentials
 
-from src.configs import ModelConfig
-from src.prompts import Prompt, Conversation
+from srcano.configs import ModelConfig
+from srcano.prompts import Prompt, Conversation
 
 from .model import BaseModel
 

@@ -4,7 +4,7 @@ from typing import Any, Dict, List, Optional
 from pydantic import BaseModel as PBM
 from pydantic import Extra, Field
 
-from src.utils.string_utils import string_hash
+from srcano.utils.string_utils import string_hash
 
 
 class Task(Enum):

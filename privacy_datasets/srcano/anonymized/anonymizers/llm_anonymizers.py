@@ -3,13 +3,13 @@ from typing import List, Iterator, Dict, Any
 from copy import deepcopy
 from .anonymizer import Anonymizer
 
-from src.utils.string_utils import select_closest
-from src.configs import Config, AnonymizerConfig
-from src.prompts import Prompt
-from src.reddit.reddit_utils import type_to_str
-from src.reddit.reddit_types import Profile
-from src.models.model import BaseModel
-from src.reddit.reddit_types import Comment, AnnotatedComments
+from srcano.utils.string_utils import select_closest
+from srcano.configs import Config, AnonymizerConfig
+from srcano.prompts import Prompt
+from srcano.reddit.reddit_utils import type_to_str
+from srcano.reddit.reddit_types import Profile
+from srcano.models.model import BaseModel
+from srcano.reddit.reddit_types import Comment, AnnotatedComments
 import re
 
 

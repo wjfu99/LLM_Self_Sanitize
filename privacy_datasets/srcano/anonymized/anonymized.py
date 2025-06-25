@@ -4,18 +4,18 @@ import json
 import re
 import textwrap
 
-from src.models.model import BaseModel
-from src.configs import AnonymizationConfig, Config
-from src.models.model_factory import get_model
-from src.reddit.reddit_utils import load_data
-from src.reddit.reddit_types import Profile, AnnotatedComments, Comment
-from src.reddit.eval import evaluate
-from src.prompts import Prompt
-from src.reddit.reddit import filter_profiles, create_prompts, parse_answer
-from src.anonymized.anonymizers.anonymizer import Anonymizer
-from src.anonymized.anonymizers.anonymizer_factory import get_anonymizer
-from src.utils.string_utils import compute_bleu, compute_rouge
-from src.reddit.reddit_utils import map_synthpai_to_pii
+from srcano.models.model import BaseModel
+from srcano.configs import AnonymizationConfig, Config
+from srcano.models.model_factory import get_model
+from srcano.reddit.reddit_utils import load_data
+from srcano.reddit.reddit_types import Profile, AnnotatedComments, Comment
+from srcano.reddit.eval import evaluate
+from srcano.prompts import Prompt
+from srcano.reddit.reddit import filter_profiles, create_prompts, parse_answer
+from srcano.anonymized.anonymizers.anonymizer import Anonymizer
+from srcano.anonymized.anonymizers.anonymizer_factory import get_anonymizer
+from srcano.utils.string_utils import compute_bleu, compute_rouge
+from srcano.reddit.reddit_utils import map_synthpai_to_pii
 
 
 # Prompts

@@ -5,17 +5,17 @@ import argparse
 from tqdm import tqdm
 
 from functools import lru_cache
-from src.configs import REDDITConfig, ModelConfig, Config
-from src.models.model import BaseModel
-from src.reddit.reddit_utils import (
+from srcano.configs import REDDITConfig, ModelConfig, Config
+from srcano.models.model import BaseModel
+from srcano.reddit.reddit_utils import (
     education_map,
 )
-from src.utils.string_utils import str_is_close, select_closest
-from src.reddit.reddit_types import Profile
-from src.utils.initialization import set_credentials, SafeOpen
-from src.models.model_factory import get_model
-from src.reddit.reddit_utils import load_data
-from src.prompts import Prompt
+from srcano.utils.string_utils import str_is_close, select_closest
+from srcano.reddit.reddit_types import Profile
+from srcano.utils.initialization import set_credentials, SafeOpen
+from srcano.models.model_factory import get_model
+from srcano.reddit.reddit_utils import load_data
+from srcano.prompts import Prompt
 import pyinputplus as pyip
 
 

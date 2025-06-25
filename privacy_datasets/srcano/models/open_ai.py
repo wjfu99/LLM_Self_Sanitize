@@ -7,8 +7,8 @@ from concurrent.futures import ThreadPoolExecutor, TimeoutError
 from openai import RateLimitError
 import credentials
 
-from src.configs import ModelConfig
-from src.prompts import Prompt, Conversation
+from srcano.configs import ModelConfig
+from srcano.prompts import Prompt, Conversation
 
 from .model import BaseModel
 

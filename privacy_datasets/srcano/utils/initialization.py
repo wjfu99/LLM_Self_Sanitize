@@ -8,7 +8,7 @@ import openai
 import yaml
 from pydantic import ValidationError
 
-from src.configs import Config
+from srcano.configs import Config
 
 from .string_utils import string_hash
 

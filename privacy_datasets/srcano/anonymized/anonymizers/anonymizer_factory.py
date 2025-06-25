@@ -2,8 +2,8 @@ from .azure_anonymizer import AzureAnonymizer
 from .llm_anonymizers import LLMFullAnonymizer, LLMBaselineAnonymizer
 from .anonymizer import Anonymizer
 
-from src.configs import AnonymizationConfig
-from src.models.model_factory import get_model
+from srcano.configs import AnonymizationConfig
+from srcano.models.model_factory import get_model
 
 def get_anonymizer(cfg: AnonymizationConfig) -> Anonymizer:
     

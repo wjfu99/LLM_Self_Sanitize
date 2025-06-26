@@ -39,6 +39,7 @@ results_paths = [p for p in save_path.iterdir() if p.is_dir()]
 
 results = []
 pi_results = []  # Store results for privacy inference dataset
+up_results = []  # Store results for user prompt dataset
 api_usage = {
     "input_tokens": 0,
     "output_tokens": 0,
@@ -331,6 +332,17 @@ for results_path in results_paths:
                 "split": split,
                 "top1_precise": top1_precise,
                 "top3_precise": top3_precise,
+            })
+        elif dataset_name == "user_prompt":
+            responses = dataset["response"]
+            ground_truths = dataset["ground_truth"]
+            results = [1 if gt in response else 0 for response, gt in zip(responses, ground_truths)]
+            accuracy = sum(results) / len(results)
+            logger.info(f"Accuracy for {algorithm_name} on {dataset_name}: {accuracy:.4f}")
+            up_results.append({
+                "defense": algorithm_name,
+                "split": split,
+                "accuracy": accuracy,
             })
                 
             

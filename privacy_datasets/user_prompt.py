@@ -139,7 +139,7 @@ def get_pii_messages_k_shot(k_shot, k=3, pp="phone number", fewshot_type="protec
         # messages.append({"role": "user", "content": question_template.format(name_list[k], pp)})
 
         all_messages.append(messages)
-        gt_list.append(personal_info_list[k])
+        gt_list.append(personal_info_list[k-1])
         
     return all_messages,gt_list
 
@@ -148,31 +148,39 @@ all_messages = {
     "positive": [],
     "negative": []
 }
+ground_truths = {
+    "positive": [],
+    "negative": []
+}
 client = openai.OpenAI(api_key="sk-db0dbebd598942c5b2669f4bcd4513fb", base_url="https://api.deepseek.com")
-num_each = 30
+num_each = 90
 total_index = 0
-filename = f"/home/fuwenjie/Self-Repair/DecodingTrust/data/privacy/enron_data/five_shot.json"
+filename = f"/home/fuwenjie/Self-Repair/reference/DecodingTrust/data/privacy/enron_data/five_shot.json"
 raw_dataset = load_dataset_by_name(filename)
 
 # for fewshot_type in ["protect", "attack"]:
 for pp in ["phone number", "ssn", "email address", "address", "password", "credit card number", "passport number", "canary number", "canary code"]:
-    for k in [1,2,3]: 
+    for k in [2]: 
         k_shot = index_dict(raw_dataset, total_index, total_index + num_each - 1)
-        positive_messages, _ = get_pii_messages_k_shot(k_shot, k=k, pp=pp, fewshot_type="attack")
-        negative_messages, _ = get_pii_messages_k_shot(k_shot, k=k, pp=pp, fewshot_type="protect")
+        positive_messages, gt1 = get_pii_messages_k_shot(k_shot, k=k, pp=pp, fewshot_type="attack")
+        negative_messages, gt2 = get_pii_messages_k_shot(k_shot, k=k, pp=pp, fewshot_type="protect")
         all_messages["positive"] += positive_messages
         all_messages["negative"] += negative_messages
+        ground_truths["positive"] += gt1
+        ground_truths["negative"] += gt2
         # response = client.chat.completions.create(model="deepseek-chat", messages=messages[0])
         # datasets[f"{pp}_{fewshot_type}_{k}"] = messages
         total_index += num_each
             
 positive_dataset = datasets.Dataset.from_dict({
     "messages": all_messages["positive"],
-    "label": [1] * len(all_messages["positive"])
+    "label": [1] * len(all_messages["positive"]),
+    "ground_truths": ground_truths["positive"]
 })
 negative_dataset = datasets.Dataset.from_dict({
     "messages": all_messages["negative"],
-    "label": [0] * len(all_messages["negative"])
+    "label": [0] * len(all_messages["negative"]),
+    "ground_truths": ground_truths["negative"]
 })
 
 all_dataset = datasets.concatenate_datasets([positive_dataset, negative_dataset])

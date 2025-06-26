@@ -1,0 +1,45 @@
+output_dir: "results"
+seed: 10
+task: "ANONYMIZED"
+dryrun: False
+save_prompts: True
+timeout: 0.0
+task_config: 
+    profile_path: "/home/fuwenjie/Self-Repair/reference/llm-anonymization/anonymized_results/synthetic/qwen25/anonymized_2.jsonl"
+    outpath: "anonymized_results/synthetic/qwen25"
+    anonymizer: 
+      anon_type: "llm"
+      target_mode: "single"
+      max_workers: 8
+    anon_model:
+      name: "Qwen/Qwen2.5-32B-Instruct"
+      provider: "openai"
+      args: {
+        temperature: 0.1
+      }
+    inference_model:
+      name: "Qwen/Qwen2.5-32B-Instruct"
+      provider: "openai"
+      args: {
+        temperature: 0.1
+      }
+    utility_model:
+      name: "Qwen/Qwen2.5-32B-Instruct"
+      provider: "openai"
+      args: {
+        temperature: 0.1
+      }
+    profile_filter:
+      hardness: 1
+      certainty: 1
+      num_tokens: 3000
+    max_num_iterations: 3
+    use_ner: False
+    offset: 0
+    num_profiles: 1000
+gen_model:
+  name: "Qwen/Qwen2.5-32B-Instruct"
+  provider: "openai"
+  args: {
+    temperature: 0.1
+  }

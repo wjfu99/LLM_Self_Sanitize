@@ -7,6 +7,7 @@ from tqdm import tqdm
 import transformers
 from transformers.pipelines.pt_utils import KeyDataset
 from tqdm.auto import tqdm
+import torch
 from torch.utils.data import Dataset
 import json
 from copy import deepcopy
@@ -101,6 +102,16 @@ def xml_tag_defense(example):
         raise ValueError(f"Unknown dataset type: {example['type']}")    
     return example
 
+def gpt_pre_anonymization(example):
+    if example["type"] == "privacy_inference":
+        example["query"] = example["anonymized_messages"]
+    elif example["type"] in ["system_prompt_clinical", "user_prompt", "regular_chat"]:
+        del example["query"]
+    else:
+        raise ValueError(f"Unknown dataset type: {example['type']}")    
+    return example
+        
+
 def construct_rewriting_prompt(example):
     query_rewriter = '''Here is an input query from the user: \n===== START OF THE INPUT QUERY =====\n{}\n=====  END OF THE INPUT QUERY   =====\n. Your job is to process the query in the following manner:\n- keep it concise but no less than 15 words. expand logically if less than 15 words.\n- fix any spelling/grammatical errors.\n- don't miss any information within the INPUT QUERY.\n- your response should be formated in a json style: {{"processed_query": PROCESSED_QUERY_HERE}}.'''
     example["rewriting_prompt"] = [
@@ -157,15 +168,8 @@ baseline_datasets["original"] = aio_dataset
 logger.info("Applying instruction defense...")
 ins_dataset = aio_dataset.map(instruction_defense)
 baseline_datasets["ins_dataset"] = ins_dataset
-logger.info("Applying sandwich defense...")
-sand_dataset = aio_dataset.map(sandwich_defense)
-baseline_datasets["sand_dataset"] = sand_dataset
-logger.info("Applying multi-turn defense...")
-multi_dataset = aio_dataset.map(multi_turn_defense)
-baseline_datasets["multi_dataset"] = multi_dataset
-logger.info("Applying xml tag defense...")
-xml_dataset = aio_dataset.map(xml_tag_defense)
-baseline_datasets["xml_dataset"] = xml_dataset
+ano_dataset = aio_dataset.map(gpt_pre_anonymization)
+baseline_datasets["gpt_pre_anonymization"] = ano_dataset
 
 # TODO: All defense (Combine all the above defenses)
 

@@ -1,0 +1,8 @@
+openai_org = ""
+openai_api_base = "http://localhost:8000/v1"
+openai_api_key = "EMPTY"
+azure_endpoint = "https://fuwenjie-sanitizeyourresponses-gpt.openai.azure.com/"
+azure_key = "6I0rU7wZBLuQw6O0drAzXumJgL9GhrVtj8ZsDbPTMSQIs2qnbjhPJQQJ99BFACL93NaXJ3w3AAABACOG7VsS"
+azure_api_version = "2024-12-01-preview"
+azure_language_endpoint = ""
+azure_language_key = ""

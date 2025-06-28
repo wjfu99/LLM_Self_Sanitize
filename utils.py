@@ -25,6 +25,14 @@ import math
 from transformers import PreTrainedTokenizer, PreTrainedTokenizerFast
 random.seed(0)
 
+def parse_max_memory(max_memory_list):
+    """Parse max_memory argument from list of 'gpu_id:memory' strings to dict"""
+    max_memory_dict = {}
+    for item in max_memory_list:
+        gpu_id, memory = item.split(':')
+        max_memory_dict[int(gpu_id)] = memory
+    return max_memory_dict
+
 def get_logger(name: str, level: Literal["info", "warning", "debug"]) -> logging.Logger:
     rich_handler = RichHandler(level=logging.INFO, rich_tracebacks=True, markup=True)
 
@@ -162,20 +170,20 @@ def prepare_model_info(model_name, layer_number: Union[int, str]=-1):
             "att": f".*transformer.h.{coll_str}.self_attention.dense"
             },
         "meta-llama/Llama-2-13b-chat-hf": {
-            "ff": f"model.layers.({coll_str}).mlp.up_proj", 
-            "att": f"model.layers.({coll_str}).self_attn.o_proj"
+            "ff": f"model.layers.{coll_str}.mlp.up_proj", 
+            "att": f"model.layers.{coll_str}.self_attn.o_proj"
             },
         "meta-llama/Llama-3.1-8B-Instruct": {
-            "ff": f"model.layers.({coll_str}).mlp.up_proj", 
-            "att": f"model.layers.({coll_str}).self_attn.o_proj"
+            "ff": f"model.layers.{coll_str}.mlp.up_proj", 
+            "att": f"model.layers.{coll_str}.self_attn.o_proj"
             },
         "Qwen/Qwen2.5-72B-Instruct": {
-            "ff": f"model.layers.({coll_str}).mlp.up_proj",
-            "att": f"model.layers.({coll_str}).self_attn.o_proj"
+            "ff": f"model.layers.{coll_str}.mlp.up_proj",
+            "att": f"model.layers.{coll_str}.self_attn.o_proj"
             },
         "meta-llama/Meta-Llama-3-70B-Instruct": {
-            "ff": f"model.layers.({coll_str}).mlp.up_proj",
-            "att": f"model.layers.({coll_str}).self_attn.o_proj"
+            "ff": f"model.layers.{coll_str}.mlp.up_proj",
+            "att": f"model.layers.{coll_str}.self_attn.o_proj"
             },
         }
     return model_info[model_name]

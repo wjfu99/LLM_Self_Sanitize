@@ -27,7 +27,7 @@ parser.add_argument("--dropout_mlp", type=float, default=0.5, help="Dropout rate
 parser.add_argument("--dropout_gru", type=float, default=0.25, help="Dropout rate for GRU")
 parser.add_argument("--learning_rate", type=float, default=1e-4, help="Learning rate for optimizer")
 parser.add_argument("--weight_decay", type=float, default=1e-2, help="Weight decay for optimizer")
-parser.add_argument("--layer_number", type=int, nargs="+", default=[32, 33, 34, 35, 36], help="The layer number to use")
+parser.add_argument("--layer_number", type=int, nargs="+", default=[64, 66, 68, 70, 72], help="The layer number to use")
 parser.add_argument("--hierarchical", action="store_true", default=True, help="Whether to use hierarchical self-monitoring")
 
 args = parser.parse_args()

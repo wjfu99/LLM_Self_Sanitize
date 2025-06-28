@@ -28,6 +28,7 @@ parser.add_argument("--self_monitor_threshold", type=float, default=0.9, help="T
 parser.add_argument("--regurgitant_tokens", type=int, default=5, help="The number of regurgitant tokens")
 parser.add_argument("--max_repair_turns", type=int, default=1, help="The maximum number of repair turns")
 parser.add_argument("--max_new_tokens", type=int, default=5000, help="The maximum number of new tokens to generate")
+parser.add_argument("--max_memory", type=str, nargs="+", default=["0:60GB", "3:70GB", "4:70GB"], help="Max memory per GPU in format 'gpu_id:memory' (e.g., '0:60GB')")
 
 args = parser.parse_args()
 
@@ -40,8 +41,14 @@ self_repair_templates = [
 ]
 
 # load the model and tokenizer
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-model = AutoModelForCausalLM.from_pretrained(args.model_name, device_map=device)
+max_memory_dict = utils.parse_max_memory(args.max_memory)
+model = AutoModelForCausalLM.from_pretrained(
+    args.model_name, 
+    device_map="balanced",
+    torch_dtype=torch.bfloat16,
+    max_memory=max_memory_dict,
+    trust_remote_code=True
+)
 tokenizer = AutoTokenizer.from_pretrained(args.model_name)
 
 # register hook to save the internal states

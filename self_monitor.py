@@ -17,8 +17,9 @@ import re
 import torch.nn.functional as F
 
 parser = argparse.ArgumentParser(description="Self-monitoring model")
-parser.add_argument("--embeddings_dir", type=str, default="./privacy_datasets/embeddings", help="The directory to save the embeddings")
-parser.add_argument("--model_name", type=str, default="meta-llama/Llama-2-13b-chat-hf", help="The model name to use")
+parser.add_argument("--embeddings_dir", type=str, default="./results/embeddings", help="The directory to save the embeddings")
+parser.add_argument("--model_name", type=str, default="Qwen/Qwen2.5-72B-Instruct", help="The model name to use")
+parser.add_argument("--output_dir", type=str, default="./results/self_monitor_models", help="The output directory for the results")
 parser.add_argument("--class_num", type=int, default=4, help="Number of classes")
 parser.add_argument("--batch_size", type=int, default=128, help="Batch size for training")
 parser.add_argument("--max_steps", type=int, default=1000, help="Maximum number of steps for training")
@@ -75,7 +76,7 @@ def gen_classifier_roc(train_features, train_labels, test_features, test_labels)
     with torch.no_grad():
         pred = F.softmax(classifier_model(X_test), dim=1)
         prediction_classes = torch.argmax(pred, dim=1).cpu()
-    save_path = Path(f"./self_monitor_models/binary/classifier_model_layer{layer}.pth")
+    save_path = Path(args.output_dir) / "binary" / args.model_name / f"monitor{layer}.pth"
     save_path.parent.mkdir(parents=True, exist_ok=True)
     torch.save(classifier_model.state_dict(), save_path)
     logger.info(f"Classifier model saved to {save_path}")
@@ -122,7 +123,7 @@ def hierachical_gen_classifier_roc(train_features, train_labels, train_l2_labels
         loss = classifier_model.lloss([pred_l1, pred_l2], [y1_train[sample], y2_train[sample]])
         loss.backward()
         optimizer.step()
-    save_path = Path(f"./self_monitor_models/hierarchical/classifier_model_layer{layer}.pth")
+    save_path = Path(args.output_dir) / "hierarchical" / args.model_name / f"monitor{layer}.pth"
     save_path.parent.mkdir(parents=True, exist_ok=True)
     torch.save(classifier_model.state_dict(), save_path)
     logger.info(f"Classifier model saved to {save_path}")

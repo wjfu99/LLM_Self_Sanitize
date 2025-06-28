@@ -18,8 +18,9 @@ import argparse
 from pathlib import Path
 
 parser = argparse.ArgumentParser(description="Self-repair mechanism")
-parser.add_argument("--self_monitor_layer", type=int, default=35, help="The layer number to use")
-parser.add_argument("--model_name", type=str, default="meta-llama/Llama-2-13b-chat-hf", help="The model name to use")
+parser.add_argument("--self_monitor_layer", type=int, default=64, help="The layer number to use")
+parser.add_argument("--monitor_model_dir", type=str, default="./results/self_monitor_models", help="The directory to load the self-monitor model")
+parser.add_argument("--model_name", type=str, default="Qwen/Qwen2.5-72B-Instruct", help="The model name to use")
 parser.add_argument("--aio_dataset", type=str, default="./privacy_datasets/preprocessed/aio", help="The dataset to use")
 parser.add_argument("--output_dir", type=str, default="./results/response/self_repair", help="The output directory for the dataset")
 parser.add_argument("--hierarchical", action="store_true", default=True, help="Whether to use hierarchical self-monitoring")
@@ -66,8 +67,9 @@ ff_hook = monitored_module.register_forward_hook(functools.partial(fetch_ff_repr
 # TODO: Multiple heads self-monitor
 monitor_dimention = monitored_module.out_features
 if args.hierarchical:
-    sm_model = HierarchicalFFSelfMonitor(input_shape=monitor_dimention).to(device)
-    sm_model.load_state_dict(torch.load(f"./self_monitor_models/hierarchical/classifier_model_layer{args.self_monitor_layer}.pth", weights_only=True))
+    sm_model = HierarchicalFFSelfMonitor(input_shape=monitor_dimention).to("cuda")
+    state_path = Path(args.monitor_model_dir) / "hierarchical" / args.model_name / f"monitor{args.self_monitor_layer}.pth"
+    sm_model.load_state_dict(torch.load(state_path, weights_only=True))
 sm_model.eval()
         
 # Load the datasets

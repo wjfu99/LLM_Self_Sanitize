@@ -162,14 +162,22 @@ def prepare_model_info(model_name, layer_number: Union[int, str]=-1):
             "att": f".*transformer.h.{coll_str}.self_attention.dense"
             },
         "meta-llama/Llama-2-13b-chat-hf": {
-            "ff": f"model.layers.{coll_str}.mlp.up_proj", 
-            "att": f".*model.layers.{coll_str}.self_attn.o_proj"
+            "ff": f"model.layers.({coll_str}).mlp.up_proj", 
+            "att": f"model.layers.({coll_str}).self_attn.o_proj"
             },
         "meta-llama/Llama-3.1-8B-Instruct": {
-            "ff": f"model.layers.{coll_str}.mlp.up_proj", 
-            "att": f".*model.layers.{coll_str}.self_attn.o_proj"
+            "ff": f"model.layers.({coll_str}).mlp.up_proj", 
+            "att": f"model.layers.({coll_str}).self_attn.o_proj"
             },
-    }
+        "Qwen/Qwen2.5-72B-Instruct": {
+            "ff": f"model.layers.({coll_str}).mlp.up_proj",
+            "att": f"model.layers.({coll_str}).self_attn.o_proj"
+            },
+        "meta-llama/Meta-Llama-3-70B-Instruct": {
+            "ff": f"model.layers.({coll_str}).mlp.up_proj",
+            "att": f"model.layers.({coll_str}).self_attn.o_proj"
+            },
+        }
     return model_info[model_name]
 
 def chat2str(messages):

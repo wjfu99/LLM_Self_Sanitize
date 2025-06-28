@@ -33,7 +33,7 @@ parser.add_argument("--datasets", type=str, nargs="+", default=["regular_chat", 
 parser.add_argument("--datasets_length", type=int, nargs="+", default=[1000, 1000, 1000, 1000], help="List of dataset lengths")
 parser.add_argument("--aio_dataset", type=str, default="./privacy_datasets/preprocessed/aio", help="The dataset to use")
 parser.add_argument("--output_dir", type=str, default="./results/embeddings", help="The output directory for the dataset")
-parser.add_argument("--model_name", type=str, default="meta-llama/Llama-2-13b-chat-hf", help="The model name to use")
+parser.add_argument("--model_name", type=str, default="meta-llama/Meta-Llama-3-70B-Instruct", help="The model name to use")
 parser.add_argument("--layer_number", type=int, nargs="+", default=[32, 33, 34, 35, 36], help="The layer number to use")
 parser.add_argument("--skip_res_tokens", type=int, default=0, help="The number of tokens to skip in the response")
 parser.add_argument("--max_monitor_tokens", type=int, default=50, help="The maximum number of tokens to monitor")
@@ -56,8 +56,10 @@ def compute_and_save_results():
     # Model
     tokenizer = AutoTokenizer.from_pretrained(args.model_name)
     model = AutoModelForCausalLM.from_pretrained(args.model_name,
-                                         device_map=device,
+                                        #  device_map=device,
                                          torch_dtype=torch.bfloat16,
+                                         device_map="balanced",
+                                         max_memory={0: "60GB", 3: "70GB", 4: "70GB"},
                                          # load_in_4bit=True,
                                          trust_remote_code=True)
     

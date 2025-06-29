@@ -37,14 +37,11 @@ parser.add_argument("--model_name", type=str, default="meta-llama/Meta-Llama-3-7
 parser.add_argument("--layer_number", type=int, nargs="+", default=[32, 33, 34, 35, 36], help="The layer number to use")
 parser.add_argument("--skip_res_tokens", type=int, default=0, help="The number of tokens to skip in the response")
 parser.add_argument("--max_monitor_tokens", type=int, default=50, help="The maximum number of tokens to monitor")
+parser.add_argument("--max_memory", type=str, nargs="+", default=["0:60GB", "3:70GB", "4:70GB"], help="Max memory per GPU in format 'gpu_id:memory' (e.g., '0:60GB')")
 args = parser.parse_args()
 
 
-# Hardware
-gpu = "0"
-device = torch.device(f"cuda:{gpu}" if torch.cuda.is_available() else "cpu")
-
-model_info = utils.prepare_model_info(args.model_name, ".*")
+model_info = utils.prepare_model_info(args.model_name, "(.*)")
 
 def fetch_selected_tokens(ff_rep, token_pos):
     for layer_num in ff_rep.keys():
@@ -55,11 +52,11 @@ def compute_and_save_results():
 
     # Model
     tokenizer = AutoTokenizer.from_pretrained(args.model_name)
+    max_memory_dict = utils.parse_max_memory(args.max_memory)
     model = AutoModelForCausalLM.from_pretrained(args.model_name,
-                                        #  device_map=device,
                                          torch_dtype=torch.bfloat16,
                                          device_map="balanced",
-                                         max_memory={0: "60GB", 3: "70GB", 4: "70GB"},
+                                         max_memory=max_memory_dict,
                                          # load_in_4bit=True,
                                          trust_remote_code=True)
     

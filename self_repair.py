@@ -71,6 +71,7 @@ if args.hierarchical:
     state_path = Path(args.monitor_model_dir) / "hierarchical" / args.model_name / f"monitor{args.self_monitor_layer}.pth"
     sm_model.load_state_dict(torch.load(state_path, weights_only=True))
 sm_model.eval()
+sm_device = next(sm_model.parameters()).device
         
 # Load the datasets
 aio_dataset = datasets.load_from_disk(args.aio_dataset)
@@ -120,7 +121,7 @@ for key, dataset in aio_dataset.items():
                 # TODO: Conduct the self-monitor every N tokens
                 # inject the self-monitor process for each tokens
                 if args.hierarchical:
-                    logits_l1, logits_l2 = sm_model(ff_rep["current"])
+                    logits_l1, logits_l2 = sm_model(ff_rep["current"].to(sm_device).to(torch.float))
                     prob_l1 = F.softmax(logits_l1, dim=-1).detach().cpu().numpy()
                     prob_l2 = F.softmax(logits_l2, dim=-1).detach().cpu().numpy()
                     prob_cache.append(prob_l1)
@@ -131,7 +132,7 @@ for key, dataset in aio_dataset.items():
                     else:
                         self_monitor_criteria = False
                 else:
-                    prob = F.softmax(sm_model(ff_rep["current"]), dim=-1).detach().cpu().numpy()
+                    prob = F.softmax(sm_model(ff_rep["current"].to(sm_device).to(torch.float)), dim=-1).detach().cpu().numpy()
                     prob_cache.append(prob)
                     if len(prob_cache) >= args.self_monitor_window:
                         prob_queue = np.array(prob_cache[-args.self_monitor_window:])

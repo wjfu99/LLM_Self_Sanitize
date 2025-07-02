@@ -168,6 +168,15 @@ baseline_datasets["original"] = aio_dataset
 logger.info("Applying instruction defense...")
 ins_dataset = aio_dataset.map(instruction_defense)
 baseline_datasets["ins_dataset"] = ins_dataset
+logger.info("Applying sandwich defense...")
+sand_dataset = aio_dataset.map(sandwich_defense)
+baseline_datasets["sand_dataset"] = sand_dataset
+logger.info("Applying multi-turn defense...")
+multi_dataset = aio_dataset.map(multi_turn_defense)
+baseline_datasets["multi_dataset"] = multi_dataset
+logger.info("Applying xml tag defense...")
+xml_dataset = aio_dataset.map(xml_tag_defense)
+baseline_datasets["xml_dataset"] = xml_dataset
 ano_dataset = aio_dataset.map(gpt_pre_anonymization)
 baseline_datasets["gpt_pre_anonymization"] = ano_dataset
 

@@ -14,7 +14,7 @@ from copy import deepcopy
 
 parser = argparse.ArgumentParser(description="Run baselines")
 parser.add_argument("--aio_dataset", type=str, default="./privacy_datasets/preprocessed/aio", help="The dataset to use")
-parser.add_argument("--model_name", type=str, default="Qwen/Qwen2.5-32B-Instruct", help="The model name to use")
+parser.add_argument("--model_name", type=str, default="meta-llama/Llama-3.1-8B-Instruct", help="The model name to use")
 parser.add_argument("--output_dir", type=str, default="./results/response", help="The output directory for the dataset")
 parser.add_argument("--batch_size", type=int, default=4, help="The batch size to use")
 parser.add_argument("--max_memory", type=str, nargs="+", default=None, help="Max memory per GPU in format 'gpu_id:memory' (e.g., '0:60GB')")
@@ -167,8 +167,9 @@ pipe = transformers.pipeline(
     max_new_tokens=512,
     torch_dtype=torch.bfloat16
 )
-pipe.tokenizer.pad_token_id = pipe.model.config.eos_token_id
-
+pipe.tokenizer.pad_token_id = pipe.tokenizer.eos_token_id
+pipe.model.generation_config.pad_token_id = pipe.tokenizer.pad_token_id
+pipe.tokenizer.padding_side= "left"
 
 logger.info("Loading the dataset...")
 aio_dataset = datasets.load_from_disk(args.aio_dataset)

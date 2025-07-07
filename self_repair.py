@@ -29,7 +29,7 @@ parser.add_argument("--self_monitor_threshold", type=float, default=0.9, help="T
 parser.add_argument("--regurgitant_tokens", type=int, default=5, help="The number of regurgitant tokens")
 parser.add_argument("--max_repair_turns", type=int, default=1, help="The maximum number of repair turns")
 parser.add_argument("--max_new_tokens", type=int, default=5000, help="The maximum number of new tokens to generate")
-parser.add_argument("--max_memory", type=str, nargs="+", default=["0:60GB", "3:70GB", "4:70GB"], help="Max memory per GPU in format 'gpu_id:memory' (e.g., '0:60GB')")
+parser.add_argument("--max_memory", type=str, nargs="+", default=None, help="Max memory per GPU in format 'gpu_id:memory' (e.g., '0:60GB')")
 
 args = parser.parse_args()
 

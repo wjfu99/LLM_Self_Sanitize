@@ -27,6 +27,8 @@ random.seed(0)
 
 def parse_max_memory(max_memory_list):
     """Parse max_memory argument from list of 'gpu_id:memory' strings to dict"""
+    if max_memory_list is None:
+        return None
     max_memory_dict = {}
     for item in max_memory_list:
         gpu_id, memory = item.split(':')

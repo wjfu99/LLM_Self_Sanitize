@@ -33,11 +33,11 @@ parser.add_argument("--datasets", type=str, nargs="+", default=["regular_chat", 
 parser.add_argument("--datasets_length", type=int, nargs="+", default=[1000, 1000, 1000, 1000], help="List of dataset lengths")
 parser.add_argument("--aio_dataset", type=str, default="./privacy_datasets/preprocessed/aio", help="The dataset to use")
 parser.add_argument("--output_dir", type=str, default="./results/embeddings", help="The output directory for the dataset")
-parser.add_argument("--model_name", type=str, default="meta-llama/Meta-Llama-3-70B-Instruct", help="The model name to use")
+parser.add_argument("--model_name", type=str, default="meta-llama/Llama-3.1-8B-Instruct", help="The model name to use")
 parser.add_argument("--layer_number", type=int, nargs="+", default=[32, 33, 34, 35, 36], help="The layer number to use")
 parser.add_argument("--skip_res_tokens", type=int, default=0, help="The number of tokens to skip in the response")
 parser.add_argument("--max_monitor_tokens", type=int, default=50, help="The maximum number of tokens to monitor")
-parser.add_argument("--max_memory", type=str, nargs="+", default=["0:60GB", "3:70GB", "4:70GB"], help="Max memory per GPU in format 'gpu_id:memory' (e.g., '0:60GB')")
+parser.add_argument("--max_memory", type=str, nargs="+", default=None, help="Max memory per GPU in format 'gpu_id:memory' (e.g., '0:60GB')")
 args = parser.parse_args()
 
 
@@ -93,7 +93,7 @@ def compute_and_save_results():
             with torch.inference_mode():
                 ff_rep.clear()
 
-                input_ids = torch.tensor([entry["input_ids"]]).to(device)
+                input_ids = torch.tensor([entry["input_ids"]]).to(model.device)
                 qa_str = tokenizer.decode(input_ids[0], skip_special_tokens=True)
                 start_pos = entry["res_start_idx"] + args.skip_res_tokens
                 length = len(input_ids[0])

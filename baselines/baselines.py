@@ -17,7 +17,7 @@ parser.add_argument("--aio_dataset", type=str, default="./privacy_datasets/prepr
 parser.add_argument("--model_name", type=str, default="Qwen/Qwen2.5-32B-Instruct", help="The model name to use")
 parser.add_argument("--output_dir", type=str, default="./results/response", help="The output directory for the dataset")
 parser.add_argument("--batch_size", type=int, default=4, help="The batch size to use")
-parser.add_argument("--max_memory", type=str, nargs="+", default=["3:50GB", "5:50GB"], help="Max memory per GPU in format 'gpu_id:memory' (e.g., '0:60GB')")
+parser.add_argument("--max_memory", type=str, nargs="+", default=None, help="Max memory per GPU in format 'gpu_id:memory' (e.g., '0:60GB')")
 
 args = parser.parse_args()
 

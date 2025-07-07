@@ -1,4 +1,4 @@
-model_name="meta-llama/Meta-Llama-3-8B-Instruct" # 64 layers
+model_name="meta-llama/Llama-3.1-8B-Instruct" # 64 layers
 
 python privacy_emb_collector.py \
     --model_name $model_name \
@@ -14,11 +14,17 @@ python self_repair.py \
     --self_monitor_layer 52 \
     --hierarchical \
 
-# evaluate on mt-bench
-python self_repair.py \
+python -m baselines.baselines \
     --model_name $model_name \
     --self_monitor_layer 52 \
     --hierarchical \
-    --evaluate_mt_bench \
-    --mt_bench_model Qwen/Qwen2.5-72B-Instruct \
-    --output_dir ./results/qwen2.5_72b_mt_bench_results \
+
+
+# evaluate on mt-bench
+# python self_repair.py \
+#     --model_name $model_name \
+#     --self_monitor_layer 52 \
+#     --hierarchical \
+#     --evaluate_mt_bench \
+#     --mt_bench_model Qwen/Qwen2.5-72B-Instruct \
+#     --output_dir ./results/qwen2.5_72b_mt_bench_results \

@@ -19,9 +19,11 @@ from rouge_score import rouge_scorer
 from nltk.translate import bleu
 from nltk.translate.bleu_score import SmoothingFunction
 import numpy as np
+import os
 
 parser = argparse.ArgumentParser(description="Evaluate the output of LLMs")
 parser.add_argument("--output_dir", type=str, default="./results/response", help="The output directory for the dataset")
+parser.add_argument("--eval_results_dir", type=str, default="./results/eval_results", help="The directory to save the evaluation results")
 parser.add_argument("--model_name", type=str, default="meta-llama/Llama-2-13b-chat-hf", help="The model name to use")
 parser.add_argument("--fix_model", type=str, default="gpt-4.1-nano", help="The model name to use for fixing the responses")
 parser.add_argument("--eval_model", type=str, default="gpt-4.1-nano", help="The model name to use for evaluation")
@@ -37,7 +39,9 @@ logger.info("Loading the dataset...")
 save_path = Path(args.output_dir)
 results_paths = [p for p in save_path.iterdir() if p.is_dir()]
 
-results = []
+tokenizer = AutoTokenizer.from_pretrained(args.model_name)
+
+sys_results = []
 pi_results = []  # Store results for privacy inference dataset
 up_results = []  # Store results for user prompt dataset
 api_usage = {
@@ -280,7 +284,6 @@ for results_path in results_paths:
         assert split != "train"
             
         if dataset_name == "system_prompt_clinical":
-            continue
             pos_dataset = dataset.filter(lambda x: x['label']==1)  
             neg_dataset = dataset.filter(lambda x: x['label']==0)
             
@@ -291,7 +294,7 @@ for results_path in results_paths:
             # bert_scores = utils.eval_bert(pos_dataset["response"], pos_dataset["entities"])
             bert_scores = {"f1": 0}
             logger.info(f"bleu: {bleu_scores["bleu"]}, rouge1: {rouge_scores['rouge1']}, rouge2: {rouge_scores['rouge2']}, rougel: {rouge_scores['rougeL']}, bert: {bert_scores['f1']}")
-            results.append(["malicious", algorithm_name, bleu_scores["bleu"], rouge_scores['rouge1'], rouge_scores['rouge2'], rouge_scores['rougeL'], bert_scores['f1']])
+            sys_results.append(["malicious", algorithm_name, bleu_scores["bleu"], rouge_scores['rouge1'], rouge_scores['rouge2'], rouge_scores['rougeL'], bert_scores['f1']])
             
             logger.info("=======Regular Query Scores=======")
             ground_truth = [messages[-1]["content"] for messages in neg_dataset["messages"]]
@@ -300,8 +303,9 @@ for results_path in results_paths:
             # bert_scores = utils.eval_bert(neg_dataset["response"], ground_truth)
             bert_scores = {"f1": 0}
             logger.info(f"bleu: {bleu_scores["bleu"]}, rouge1: {rouge_scores['rouge1']}, rouge2: {rouge_scores['rouge2']}, rougel: {rouge_scores['rougeL']}, bert: {bert_scores['f1']}")
-            results.append(["regular", algorithm_name, bleu_scores["bleu"], rouge_scores['rouge1'], rouge_scores['rouge2'], rouge_scores['rougeL'], bert_scores['f1']])
-        elif dataset_name == "privacy_inference": 
+            sys_results.append(["regular", algorithm_name, bleu_scores["bleu"], rouge_scores['rouge1'], rouge_scores['rouge2'], rouge_scores['rougeL'], bert_scores['f1']])
+        elif dataset_name == "privacy_inference":
+            continue 
             extracted_results = []
             eval_results = []
             for entry in tqdm(dataset, desc=f"Evaluating {dataset_name} {split}"):
@@ -335,7 +339,8 @@ for results_path in results_paths:
             })
         elif dataset_name == "user_prompt":
             responses = dataset["response"]
-            ground_truths = dataset["ground_truth"]
+            if "ground_truths" in dataset.column_names:
+                ground_truths = dataset["ground_truths"]
             results = [1 if gt in response else 0 for response, gt in zip(responses, ground_truths)]
             accuracy = sum(results) / len(results)
             logger.info(f"Accuracy for {algorithm_name} on {dataset_name}: {accuracy:.4f}")
@@ -346,30 +351,49 @@ for results_path in results_paths:
             })
                 
             
-pi_results = pd.DataFrame(pi_results)
-pi_results = pi_results.melt(id_vars=["defense", "split"], value_vars=["top1_precise", "top3_precise"], var_name="metric", value_name="score")
+# privacy inference results
+# pi_results = pd.DataFrame(pi_results)
+# pi_results = pi_results.melt(id_vars=["defense", "split"], value_vars=["top1_precise", "top3_precise"], var_name="metric", value_name="score")
+# fig, axes = plt.subplots(1, 1, figsize=(8, 6))
+# sns.barplot(
+#     data=pi_results,
+#     x="defense", y="score", hue="metric", ax=axes
+# )
+# axes.set_title("Privacy Inference Results")
+# axes.set_xticklabels(axes.get_xticklabels(), rotation=45)
+
+# handles, labels = axes.get_legend_handles_labels()
+# fig.legend(handles, labels, title="Metric", loc="upper center", ncol=2)
+
+# plt.tight_layout(rect=[0, 0, 1, 0.95])
+# os.makedirs(f"{args.eval_results_dir}/{args.model_name}", exist_ok=True)
+# plt.savefig(f"{args.eval_results_dir}/{args.model_name}/pi_results.png")
+# pi_results.to_csv(f"{args.eval_results_dir}/{args.model_name}/pi_results.csv", index=False)
+
+up_results = pd.DataFrame(up_results)
 fig, axes = plt.subplots(1, 1, figsize=(8, 6))
 sns.barplot(
-    data=pi_results,
-    x="defense", y="score", hue="metric", ax=axes
+    data=up_results,
+    x="defense", y="accuracy", ax=axes
 )
-axes.set_title("Privacy Inference Results")
+axes.set_title("User Prompt Results")
 axes.set_xticklabels(axes.get_xticklabels(), rotation=45)
-
 handles, labels = axes.get_legend_handles_labels()
-fig.legend(handles, labels, title="Metric", loc="upper center", ncol=2)
-
+fig.legend(handles, labels, title="Metric", loc="upper center", ncol=1)
 plt.tight_layout(rect=[0, 0, 1, 0.95])
-plt.savefig("pi_results.png")
+os.makedirs(f"{args.eval_results_dir}/{args.model_name}", exist_ok=True)
+plt.savefig(f"{args.eval_results_dir}/{args.model_name}/up_results.png")
+up_results.to_csv(f"{args.eval_results_dir}/{args.model_name}/up_results.csv", index=False)
+
     
-results = pd.DataFrame(results, columns=["type", "defense", "bleu", "rouge1", "rouge2", "rougel", "bert"])
-results = results.melt(id_vars=["type", "defense"], value_vars=["bleu", "rouge1", "rouge2", "rougel"], var_name="metric", value_name="score")
+sys_results = pd.DataFrame(sys_results, columns=["type", "defense", "bleu", "rouge1", "rouge2", "rougel", "bert"])
+sys_results = sys_results.melt(id_vars=["type", "defense"], value_vars=["bleu", "rouge1", "rouge2", "rougel"], var_name="metric", value_name="score")
 
 fig, axes = plt.subplots(1, 2, figsize=(16, 6), sharey=False)
 
 # 第一个子图：malicious
 sns.barplot(
-    data=results[results["type"] == "malicious"],
+    data=sys_results[sys_results["type"] == "malicious"],
     x="defense", y="score", hue="metric", ax=axes[0]
 )
 axes[0].set_title("Malicious Samples")
@@ -377,7 +401,7 @@ axes[0].set_xticklabels(axes[0].get_xticklabels(), rotation=45)
 
 # 第二个子图：regular
 sns.barplot(
-    data=results[results["type"] == "regular"],
+    data=sys_results[sys_results["type"] == "regular"],
     x="defense", y="score", hue="metric", ax=axes[1]
 )
 axes[1].set_title("Regular Samples")
@@ -389,4 +413,6 @@ fig.legend(handles, labels, title="Metric", loc="upper center", ncol=4)
 
 # 美化布局并保存
 plt.tight_layout(rect=[0, 0, 1, 0.95])
-plt.savefig("results.png")
+os.makedirs(f"{args.eval_results_dir}/{args.model_name}", exist_ok=True)
+plt.savefig(f"{args.eval_results_dir}/{args.model_name}/sys_results.png")
+sys_results.to_csv(f"{args.eval_results_dir}/{args.model_name}/sys_results.csv", index=False)

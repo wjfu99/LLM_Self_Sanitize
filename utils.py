@@ -181,6 +181,10 @@ def prepare_model_info(model_name, layer_number: Union[int, str]=-1):
             "ff": f"model.layers.{coll_str}.mlp.up_proj",
             "att": f"model.layers.{coll_str}.self_attn.o_proj"
             },
+        "Qwen/Qwen2.5-32B-Instruct": {
+            "ff": f"model.layers.{coll_str}.mlp.up_proj",
+            "att": f"model.layers.{coll_str}.self_attn.o_proj"
+            },
         "meta-llama/Meta-Llama-3-70B-Instruct": {
             "ff": f"model.layers.{coll_str}.mlp.up_proj",
             "att": f"model.layers.{coll_str}.self_attn.o_proj"

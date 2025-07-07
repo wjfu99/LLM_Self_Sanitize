@@ -1,3 +1,4 @@
+# 80 layers
 python privacy_emb_collector.py \
     --model_name Qwen/Qwen2.5-72B-Instruct \
     --layer_number 64 66 68 70 72 \

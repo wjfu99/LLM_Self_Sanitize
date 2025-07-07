@@ -88,7 +88,7 @@ for key, dataset in aio_dataset.items():
         split = match.group(2)
     else:
         raise ValueError(f"Invalid key format: {key}")
-    if split == "train":
+    if split == "train" or dataset_name == "regular_chat":
         continue
     # else:
     #     dataset = dataset.filter(lambda x: x['label']==1).select(range(50))
@@ -118,7 +118,7 @@ for key, dataset in aio_dataset.items():
             self_monitor_type = -1
             interrupted_message = None
             while unfinished_sequences:
-                outputs = model.generate(**inputs, past_key_values=past_key_values, max_new_tokens=1, output_hidden_states=True, return_dict_in_generate=True)
+                outputs = model.generate(**inputs, past_key_values=past_key_values, max_new_tokens=1, output_hidden_states=True, return_dict_in_generate=True, do_sample=True)
                 
                 # TODO: Conduct the self-monitor every N tokens
                 # inject the self-monitor process for each tokens

@@ -51,6 +51,8 @@ model = AutoModelForCausalLM.from_pretrained(
     trust_remote_code=True
 )
 tokenizer = AutoTokenizer.from_pretrained(args.model_name)
+tokenizer.pad_token_id = tokenizer.eos_token_id
+model.generation_config.pad_token_id = tokenizer.pad_token_id
 
 # register hook to save the internal states
 # ff_hook = {}

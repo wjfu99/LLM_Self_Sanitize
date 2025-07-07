@@ -18,18 +18,19 @@ parser.add_argument("--aio_dataset", type=str, default="./privacy_datasets/prepr
 parser.add_argument("--model_name", type=str, default="meta-llama/Llama-2-13b-chat-hf", help="The model name to use")
 parser.add_argument("--output_dir", type=str, default="./results/response", help="The output directory for the dataset")
 parser.add_argument("--batch_size", type=int, default=4, help="The batch size to use")
+parser.add_argument("--max_memory", type=str, nargs="+", default=["7:50GB", "1:20GB", "4:20GB"], help="Max memory per GPU in format 'gpu_id:memory' (e.g., '0:60GB')")
 
 args = parser.parse_args()
 
 logger = utils.get_logger(__name__, level="info")
 
 
-
-
 logger.info("Loading the model...")
+max_memory_dict = utils.parse_max_memory(args.max_memory)
 model = AutoModelForCausalLM.from_pretrained(
     args.model_name, 
     device_map="balanced",
+    max_memory=max_memory_dict,
     torch_dtype=torch.bfloat16,
     trust_remote_code=True
 )

@@ -14,7 +14,7 @@ from copy import deepcopy
 
 parser = argparse.ArgumentParser(description="Run baselines")
 parser.add_argument("--aio_dataset", type=str, default="./privacy_datasets/preprocessed/aio", help="The dataset to use")
-parser.add_argument("--model_name", type=str, default="meta-llama/Llama-2-13b-chat-hf", help="The model name to use")
+parser.add_argument("--model_name", type=str, default="Qwen/Qwen2.5-32B-Instruct", help="The model name to use")
 parser.add_argument("--output_dir", type=str, default="./results/response", help="The output directory for the dataset")
 parser.add_argument("--batch_size", type=int, default=4, help="The batch size to use")
 
@@ -158,6 +158,7 @@ pipe = transformers.pipeline(
     # "text-generation",
     model=args.model_name,
     device_map="balanced",
+    model_kwargs={"max_memory": {3: "50GB",5: "50GB", 5: "50GiB"}},
     do_sample=True,
     num_return_sequences=1,
     batch_size=args.batch_size,

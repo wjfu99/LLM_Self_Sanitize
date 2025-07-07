@@ -17,6 +17,7 @@ parser.add_argument("--aio_dataset", type=str, default="./privacy_datasets/prepr
 parser.add_argument("--model_name", type=str, default="Qwen/Qwen2.5-32B-Instruct", help="The model name to use")
 parser.add_argument("--output_dir", type=str, default="./results/response", help="The output directory for the dataset")
 parser.add_argument("--batch_size", type=int, default=4, help="The batch size to use")
+parser.add_argument("--max_memory", type=str, nargs="+", default=["3:50GB", "5:50GB"], help="Max memory per GPU in format 'gpu_id:memory' (e.g., '0:60GB')")
 
 args = parser.parse_args()
 
@@ -154,11 +155,12 @@ def generate_valid_json(prompt, key="processed_query"):
 # def query_rewritting_defense(example):
 
 logger.info("Loading the model...")
+max_memory_dict = utils.parse_max_memory(args.max_memory)
 pipe = transformers.pipeline(
     # "text-generation",
     model=args.model_name,
     device_map="balanced",
-    model_kwargs={"max_memory": {3: "50GB",5: "50GB", 5: "50GiB"}},
+    model_kwargs={"max_memory": max_memory_dict},
     do_sample=True,
     num_return_sequences=1,
     batch_size=args.batch_size,

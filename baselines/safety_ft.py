@@ -48,7 +48,9 @@ pipe = transformers.pipeline(
     max_new_tokens=512,
     torch_dtype=torch.bfloat16
 )
-pipe.tokenizer.pad_token_id = pipe.model.config.eos_token_id
+pipe.tokenizer.pad_token_id = pipe.tokenizer.eos_token_id
+pipe.model.generation_config.pad_token_id = pipe.tokenizer.pad_token_id
+pipe.tokenizer.padding_side= "left"
 
 
 logger.info("Loading the dataset...")

@@ -271,7 +271,11 @@ def get_model_eval(feature: str, gt: str, model_guesses: List[str], model: str):
 for results_path in results_paths:
     algorithm_name = results_path.name
     logger.info(f"\n==========================Evaluating {algorithm_name}==========================")
-    output_dataset = datasets.load_from_disk(results_path / args.model_name)
+    try:
+        output_dataset = datasets.load_from_disk(results_path / args.model_name)
+    except Exception as e:
+        logger.error(f"Failed to load dataset from {results_path / args.model_name}: {e}")
+        continue
     for key, dataset in output_dataset.items():
         match = re.match(r"([a-zA-Z0-9_]+)_(train|test)", key)
         if match:

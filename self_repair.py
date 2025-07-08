@@ -26,6 +26,7 @@ parser.add_argument("--output_dir", type=str, default="./results/response/self_r
 parser.add_argument("--hierarchical", action="store_true", default=True, help="Whether to use hierarchical self-monitoring")
 parser.add_argument("--self_monitor_window", type=int, default=5, help="The window size for self-monitoring")
 parser.add_argument("--self_monitor_threshold", type=float, default=0.9, help="The threshold for self-monitoring")
+parser.add_argument("--self_monitor_start", type=int, default=5, help="The number of tokens to start self-monitoring")
 parser.add_argument("--regurgitant_tokens", type=int, default=5, help="The number of regurgitant tokens")
 parser.add_argument("--max_repair_turns", type=int, default=1, help="The maximum number of repair turns")
 parser.add_argument("--max_new_tokens", type=int, default=5000, help="The maximum number of new tokens to generate")
@@ -128,7 +129,7 @@ for key, dataset in aio_dataset.items():
                     prob_l2 = F.softmax(logits_l2, dim=-1).detach().cpu().numpy()
                     prob_cache.append(prob_l1)
                     prob_l2_cache.append(prob_l2)
-                    if len(prob_cache) >= args.self_monitor_window:
+                    if len(prob_cache) >= args.self_monitor_start:
                         prob_queue = np.array(prob_cache[-args.self_monitor_window:])
                         self_monitor_criteria = prob_queue.mean(axis=0)[1] > args.self_monitor_threshold
                     else:
@@ -136,7 +137,7 @@ for key, dataset in aio_dataset.items():
                 else:
                     prob = F.softmax(sm_model(ff_rep["current"].to(sm_device).to(torch.float)), dim=-1).detach().cpu().numpy()
                     prob_cache.append(prob)
-                    if len(prob_cache) >= args.self_monitor_window:
+                    if len(prob_cache) >= args.self_monitor_start:
                         prob_queue = np.array(prob_cache[-args.self_monitor_window:])
                         # TODO: Maybe we can use prob_queue.mean(axis=0)[1:].sum() to deploy a more flexible self-monitor criteria
                         self_monitor_criteria = prob_queue.mean(axis=0)[1:].max() > args.self_monitor_threshold # or prob_queue[-1, 1:].max() > 0.9

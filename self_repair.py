@@ -166,7 +166,7 @@ for key, dataset in aio_dataset.items():
                     input_length = inputs["input_ids"].shape[1]
                     # prepare the input_ids for the next round
                     messages = messages + [{"role": "assistant", "content": interrupted_message}]
-                    inputs = tokenizer.apply_chat_template(messages, add_generation_prompt=True, return_tensors="pt", return_dict=True).to(model.device)
+                    inputs = tokenizer.apply_chat_template(messages, add_generation_prompt=False, return_tensors="pt", return_dict=True, continue_final_message=True).to(model.device)
                     # remove it from the final messages
                     del messages[-1]
                     inputs["attention_mask"] = torch.ones_like(inputs["input_ids"])

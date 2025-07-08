@@ -171,6 +171,10 @@ def prepare_model_info(model_name, layer_number: Union[int, str]=-1):
             "ff": f".*transformer.h.{coll_str}.mlp.dense_4h_to_h", 
             "att": f".*transformer.h.{coll_str}.self_attention.dense"
             },
+        "mistralai/Mistral-Nemo-Instruct-2407": {
+            "ff": f"model.layers.{coll_str}.mlp.up_proj", 
+            "att": f"model.layers.{coll_str}.self_attn.o_proj"
+            },
         "meta-llama/Llama-2-13b-chat-hf": {
             "ff": f"model.layers.{coll_str}.mlp.up_proj", 
             "att": f"model.layers.{coll_str}.self_attn.o_proj"
@@ -188,6 +192,14 @@ def prepare_model_info(model_name, layer_number: Union[int, str]=-1):
             "att": f"model.layers.{coll_str}.self_attn.o_proj"
             },
         "meta-llama/Meta-Llama-3-70B-Instruct": {
+            "ff": f"model.layers.{coll_str}.mlp.up_proj",
+            "att": f"model.layers.{coll_str}.self_attn.o_proj"
+            },
+        "Qwen/Qwen3-14B": {
+            "ff": f"model.layers.{coll_str}.mlp.up_proj",
+            "att": f"model.layers.{coll_str}.self_attn.o_proj"
+            },
+        "Qwen/Qwen3-32B": {
             "ff": f"model.layers.{coll_str}.mlp.up_proj",
             "att": f"model.layers.{coll_str}.self_attn.o_proj"
             },

@@ -1,17 +1,17 @@
-model_name="meta-llama/Llama-3.1-8B-Instruct" # 32 layers
+model_name="Qwen/Qwen2.5-32B-Instruct" # 64 layers
 
 python privacy_emb_collector.py \
     --model_name $model_name \
-    --layer_number 26 27 28 29 30 \
+    --layer_number 52 54 56 58 60 \
 
 python self_monitor.py \
     --model_name $model_name \
-    --layer_number 26 27 28 29 30 \
+    --layer_number 52 54 56 58 60 \
     --hierarchical \
 
 python self_repair.py \
     --model_name $model_name \
-    --self_monitor_layer 26 \
+    --self_monitor_layer 52 \
     --hierarchical \
 
 # python -m baselines.baselines \

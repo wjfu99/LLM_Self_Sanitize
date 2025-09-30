@@ -1,23 +1,24 @@
-model_name="meta-llama/Llama-3.1-8B-Instruct" # 32 layers
+model_name="mistralai/Mistral-Nemo-Instruct-2407" # 40 layers
 
 python privacy_emb_collector.py \
     --model_name $model_name \
-    --layer_number 26 27 28 29 30 \
+    --layer_number 32 33 34 35 36 \
 
 python self_monitor.py \
     --model_name $model_name \
-    --layer_number 26 27 28 29 30 \
+    --layer_number 32 33 34 35 36 \
     --hierarchical \
 
 python self_repair.py \
     --model_name $model_name \
-    --self_monitor_layer 26 \
+    --self_monitor_layer 32 \
     --hierarchical \
 
-# python -m baselines.baselines \
-#     --model_name $model_name \
+python -m baselines.baselines \
+    --model_name $model_name \
 
-
+python -m baselines.safety_ft \
+    --model_name $model_name \
 # evaluate on mt-bench
 # python self_repair.py \
 #     --model_name $model_name \

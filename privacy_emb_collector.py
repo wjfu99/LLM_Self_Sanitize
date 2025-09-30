@@ -18,15 +18,11 @@ from collections import defaultdict, Counter
 from functools import partial
 import re
 from string import Template
-from dataset_constructor import create_dataset
 from utils import data_preprocess
 from huggingface_hub import login
 import argparse
 import utils
 from copy import deepcopy
-
-# Hf credentials
-login("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")
 
 parser = argparse.ArgumentParser(description="Collect privacy embeddings")
 parser.add_argument("--datasets", type=str, nargs="+", default=["regular_chat", "system_prompt_clinical", "privacy_inference", "user_prompt"], help="List of datasets to construct")

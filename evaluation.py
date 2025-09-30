@@ -27,8 +27,8 @@ parser.add_argument("--eval_results_dir", type=str, default="./results/eval_resu
 parser.add_argument("--model_name", type=str, default="meta-llama/Llama-2-13b-chat-hf", help="The model name to use")
 parser.add_argument("--fix_model", type=str, default="gpt-4.1-nano", help="The model name to use for fixing the responses")
 parser.add_argument("--eval_model", type=str, default="gpt-4.1-nano", help="The model name to use for evaluation")
-parser.add_argument("--azure_endpoint", type=str, default="https://fuwenjie-sanitizeyourresponses-gpt.openai.azure.com/", help="The Azure endpoint for the model")
-parser.add_argument("--azure_api_key", type=str, default="6I0rU7wZBLuQw6O0drAzXumJgL9GhrVtj8ZsDbPTMSQIs2qnbjhPJQQJ99BFACL93NaXJ3w3AAABACOG7VsS", help="The Azure API key for the model")
+parser.add_argument("--azure_endpoint", type=str, default="xxx", help="The Azure endpoint for the model")
+parser.add_argument("--azure_api_key", type=str, default="xxx", help="The Azure API key for the model")
 parser.add_argument("--azure_api_version", type=str, default="2024-12-01-preview", help="The Azure API version for the model")
 args = parser.parse_args()
 

@@ -27,13 +27,14 @@ _**[Wenjie Fu](https://wjfu99.github.io)<sup>1</sup>, [Huandong Wang](https://sc
   - [Overview](#overview)
   - [Quick Start](#quick-start)
   - [Requirements](#requirements)
-  - [Dataset Construction](#dataset-construction)
-  - [Representation Collection](#representation-collection)
-  - [Train / Prepare the Self-Monitor](#train--prepare-the-self-monitor)
-  - [Self-Sanitizing Generation](#self-sanitizing-generation)
-  - [Evaluation](#evaluation)
-  - [Reproducing Paper Experiments](#reproducing-paper-experiments)
-  - [Configuration Notes](#configuration-notes)
+  - [Detailed Instructions](#detailed-instructions)
+    - [Dataset Construction](#dataset-construction)
+    - [Representation Collection](#representation-collection)
+    - [Train / Prepare the Self-Monitor](#train--prepare-the-self-monitor)
+    - [Self-Sanitizing Generation](#self-sanitizing-generation)
+    - [Evaluation](#evaluation)
+    - [Reproducing Paper Experiments](#reproducing-paper-experiments)
+    - [Configuration Notes](#configuration-notes)
   - [Citation](#citation)
   - [Disclaimer](#disclaimer)
 
@@ -94,8 +95,9 @@ pip install -r requirements.txt
 ```
 
 
+## Detailed Instructions
 
-## Dataset Construction
+### Dataset Construction
 
 The benchmark dataset is built from multiple privacy-relevant sources. Run:
 
@@ -110,7 +112,7 @@ cd ..
 
 Outputs are stored under `privacy_datasets/preprocessed/` and related subfolders.
 
-## Representation Collection
+### Representation Collection
 
 Extract and persist selected layer hidden states to train the self-monitor:
 
@@ -125,7 +127,7 @@ Key arguments:
 
 Embeddings are saved in `results/embeddings/<model_name>/layer<layer_number>/`.
 
-## Train / Prepare the Self-Monitor
+### Train / Prepare the Self-Monitor
 
 ```bash
 python self_monitor.py --model_name <hf_model_name> --layer_number <layer_idx> [--hierarchical]
@@ -133,17 +135,15 @@ python self_monitor.py --model_name <hf_model_name> --layer_number <layer_idx> [
 
 Produces classifier weights under `self_monitor_models/` (hierarchical mode creates multiple layer-level checkpoints).
 
-## Self-Sanitizing Generation
+### Self-Sanitizing Generation
 
 ```bash
 python self_repair.py --model_name <hf_model_name> --self_monitor_layer <layer_idx> [--hierarchical]
 ```
 
-Generations (both raw and repaired) are written to `results/response/` (and variant folders). The tool intercepts streaming tokens and applies repairs when the risk score surpasses threshold(s).
+Generations are written to `results/response/`. 
 
-Advanced / multi-turn or benchmark-wide evaluation variants may use `self_repair_mt.py` and scripts in `scripts/`.
-
-## Evaluation
+### Evaluation
 
 ```bash
 python evaluation.py --model_name <hf_model_name>
@@ -151,7 +151,7 @@ python evaluation.py --model_name <hf_model_name>
 
 Generates metrics under `results/eval_results/` 
 
-## Reproducing Paper Experiments
+### Reproducing Paper Experiments
 
 Shell scripts for the main models are in `scripts/`:
 
@@ -169,7 +169,7 @@ bash scripts/llama3.1_8b.sh
 
 
 
-## Configuration Notes
+### Configuration Notes
 
 - Hierarchical mode: add `--hierarchical` to build multi-stage monitors (lower + higher layer fusion).
 - Layer selection: empirically mid-to-late layers often balance semantic richness vs. specialization; tune `--layer_number`.

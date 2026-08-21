@@ -1,0 +1,8 @@
+openai_org = ""
+openai_api_base = "http://localhost:8000/v1"
+openai_api_key = "EMPTY"
+azure_endpoint = "xxx"
+azure_key = "xxx"
+azure_api_version = "2024-12-01-preview"
+azure_language_endpoint = ""
+azure_language_key = ""
